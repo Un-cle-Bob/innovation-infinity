@@ -28,14 +28,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
     let totalExecuted = 0;
 
     const domainStats: {
-      [domainCode: string]: { name: string; budget: number; executed: number; taskCount: number };
+      [domainCode: string]: {
+        name: string;
+        budget: number;
+        executed: number;
+        taskCount: number;
+        fundBreakdown: { 이월금: number; 기본사업비: number; 적정규모화: number };
+      };
     } = {
-      'IA': { name: '교육혁신(IA)', budget: 0, executed: 0, taskCount: 0 },
-      'IB': { name: '고등직업교육혁신(IB)', budget: 0, executed: 0, taskCount: 0 },
-      'IC': { name: '산학혁신(IC)', budget: 0, executed: 0, taskCount: 0 },
-      'ID': { name: '지역협력혁신(ID)', budget: 0, executed: 0, taskCount: 0 },
-      'IE': { name: '자율혁신(IE)', budget: 0, executed: 0, taskCount: 0 },
-      'IZ': { name: '사업관리 및 운영(IZ)', budget: 0, executed: 0, taskCount: 0 },
+      'IA': { name: '교육혁신(IA)', budget: 0, executed: 0, taskCount: 0, fundBreakdown: { 이월금: 0, 기본사업비: 0, 적정규모화: 0 } },
+      'IB': { name: '고등직업교육혁신(IB)', budget: 0, executed: 0, taskCount: 0, fundBreakdown: { 이월금: 0, 기본사업비: 0, 적정규모화: 0 } },
+      'IC': { name: '산학혁신(IC)', budget: 0, executed: 0, taskCount: 0, fundBreakdown: { 이월금: 0, 기본사업비: 0, 적정규모화: 0 } },
+      'ID': { name: '지역협력혁신(ID)', budget: 0, executed: 0, taskCount: 0, fundBreakdown: { 이월금: 0, 기본사업비: 0, 적정규모화: 0 } },
+      'IE': { name: '자율혁신(IE)', budget: 0, executed: 0, taskCount: 0, fundBreakdown: { 이월금: 0, 기본사업비: 0, 적정규모화: 0 } },
+      'IZ': { name: '사업관리 및 운영(IZ)', budget: 0, executed: 0, taskCount: 0, fundBreakdown: { 이월금: 0, 기본사업비: 0, 적정규모화: 0 } },
     };
 
     const fundTotals = {
@@ -54,6 +60,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
         domainStats[codePrefix].budget += taskSummary.total_budget;
         domainStats[codePrefix].executed += taskSummary.total_executed;
         domainStats[codePrefix].taskCount += 1;
+        domainStats[codePrefix].fundBreakdown.이월금 += taskSummary.fund_summary.이월금.budget;
+        domainStats[codePrefix].fundBreakdown.기본사업비 += taskSummary.fund_summary.기본사업비.budget;
+        domainStats[codePrefix].fundBreakdown.적정규모화 += taskSummary.fund_summary.적정규모화.budget;
       }
 
       fundTotals.이월금.budget += taskSummary.fund_summary.이월금.budget;
@@ -124,7 +133,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
             </span>
           </div>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-white">
-            대학혁신지원사업 운영 대시보드
+            경북과학대학교 혁신지원사업 운영 대시보드
           </h2>
           <p className="text-xs text-slate-300 mt-1">
             총 {Object.keys(tasks).length}개 세부과제 · {summary.totalItems}개 주요추진항목 · {executions.length}건 집행 관리 중
@@ -269,7 +278,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
           </div>
 
           <div className="mt-4 space-y-3.5">
-            {Object.entries(summary.domainStats).map(([code, dom]: [string, { name: string; budget: number; executed: number; taskCount: number }]) => {
+            {Object.entries(summary.domainStats).map(
+              ([code, dom]: [
+                string,
+                {
+                  name: string;
+                  budget: number;
+                  executed: number;
+                  taskCount: number;
+                  fundBreakdown: { 이월금: number; 기본사업비: number; 적정규모화: number };
+                }
+              ]) => {
               const rate = dom.budget > 0 ? (dom.executed / dom.budget) * 100 : 0;
               return (
                 <div key={code} className="space-y-1.5">
@@ -305,6 +324,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigate }) => {
                       style={{ width: `${Math.min(100, rate)}%` }}
                     />
                   </div>
+                  {/* 재원별(이월금/기본사업비/적정규모화) 미니 브레이크다운 */}
+                  {dom.budget > 0 && (
+                    <div className="flex items-center gap-2.5 pl-0.5 text-[10px] text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                        이월금 ₩{dom.fundBreakdown.이월금.toLocaleString()}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                        기본사업비 ₩{dom.fundBreakdown.기본사업비.toLocaleString()}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />
+                        적정규모화 ₩{dom.fundBreakdown.적정규모화.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}

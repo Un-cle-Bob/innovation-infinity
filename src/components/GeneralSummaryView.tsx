@@ -391,6 +391,52 @@ export const GeneralSummaryView: React.FC = () => {
     exportSummaryGridToExcel(rows, EXPENSE_CATEGORIES, currentYear, periodLabel.replace(/[\s\/\(\)]/g, '_'));
   };
 
+  // 영역별 요약본 엑셀 다운로드 (세부과제 통합, 영역 6개 × 재원 4행)
+  const handleExportDomainSummaryExcel = () => {
+    const rows: any[] = [];
+
+    domainGroups.forEach((group) => {
+      const sources: (FundSource | '합계')[] =
+        displayMode === 'detailed' ? ['이월금', '기본사업비', '적정규모화', '합계'] : ['합계'];
+
+      sources.forEach((src) => {
+        const isTotal = src === '합계';
+        const fundSrc = isTotal ? undefined : src;
+        const tot = getDomainTotalData(group.tasks, fundSrc);
+
+        const rowData: any = {
+          영역코드: group.domainCode,
+          세부과제코드: group.domainName,
+          재원구분: src,
+        };
+
+        EXPENSE_CATEGORIES.forEach((cat) => {
+          const cData = getDomainCellData(group.tasks, cat, fundSrc);
+          rowData[`${cat}_예산`] = cData.budget;
+          rowData[`${cat}_실적`] = cData.executed;
+          rowData[`${cat}_잔액`] = cData.remaining;
+          rowData[`${cat}_집행률`] =
+            cData.budget > 0 ? `${((cData.executed / cData.budget) * 100).toFixed(1)}%` : '-';
+        });
+
+        rowData['총예산'] = tot.totalBudget;
+        rowData['총실적'] = tot.totalExecuted;
+        rowData['총잔액'] = tot.remaining;
+        rowData['집행률(%)'] = tot.rate.toFixed(1) + '%';
+
+        rows.push(rowData);
+      });
+    });
+
+    exportSummaryGridToExcel(
+      rows,
+      EXPENSE_CATEGORIES,
+      currentYear,
+      periodLabel.replace(/[\s\/\(\)]/g, '_'),
+      '영역별요약'
+    );
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -418,7 +464,16 @@ export const GeneralSummaryView: React.FC = () => {
             title="총괄표 엑셀 파일(.xlsx)로 내보내기"
           >
             <Download className="h-4 w-4 text-emerald-700" />
-            <span>총괄표 엑셀 다운로드</span>
+            <span>총괄표 엑셀 다운로드 (세부과제별)</span>
+          </button>
+
+          <button
+            onClick={handleExportDomainSummaryExcel}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-teal-600 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition-colors shadow-2xs"
+            title="세부과제를 합쳐서 영역 단위로만 요약한 엑셀 다운로드"
+          >
+            <Download className="h-4 w-4 text-teal-700" />
+            <span>영역별 요약 다운로드</span>
           </button>
 
           <button
@@ -635,20 +690,26 @@ export const GeneralSummaryView: React.FC = () => {
 
       {/* 3. Executive KPI Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 print:hidden">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs min-w-0 text-center">
           <span className="text-[11px] font-semibold text-slate-500">총 편성 예산</span>
-          <div className="text-base font-extrabold text-slate-900 font-mono mt-0.5">
+          <div
+            className="text-base font-extrabold text-slate-900 font-mono mt-0.5 truncate"
+            title={`₩${grandTotal.overallBudget.toLocaleString()}`}
+          >
             ₩{grandTotal.overallBudget.toLocaleString()}
           </div>
           <div className="mt-1.5 grid grid-cols-3 gap-1 border-t border-slate-100 pt-1.5">
             {(['이월금', '기본사업비', '적정규모화'] as const).map((src) => {
               const fundColor = getFundColorTheme(src);
               return (
-                <div key={src} className="text-center">
+                <div key={src} className="text-center min-w-0">
                   <span className={`inline-block rounded px-1 py-0.5 text-[9px] font-bold ${fundColor.badge}`}>
                     {src}
                   </span>
-                  <div className="text-[10px] font-bold text-slate-700 font-mono mt-0.5">
+                  <div
+                    className="text-[10px] font-bold text-slate-700 font-mono mt-0.5 truncate"
+                    title={`₩${grandTotalsBySource[src].overallBudget.toLocaleString()}`}
+                  >
                     ₩{grandTotalsBySource[src].overallBudget.toLocaleString()}
                   </div>
                 </div>
@@ -657,26 +718,44 @@ export const GeneralSummaryView: React.FC = () => {
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs min-w-0 text-center">
           <span className="text-[11px] font-semibold text-emerald-700">
             {periodLabel} 실적(집행액)
           </span>
-          <div className="text-base font-extrabold text-emerald-700 font-mono mt-0.5">
+          <div
+            className="text-base font-extrabold text-emerald-700 font-mono mt-0.5 truncate"
+            title={`₩${grandTotal.overallExecuted.toLocaleString()}`}
+          >
             ₩{grandTotal.overallExecuted.toLocaleString()}
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs min-w-0 text-center">
           <span className="text-[11px] font-semibold text-blue-700">집행 잔액</span>
-          <div className="text-base font-extrabold text-blue-700 font-mono mt-0.5">
+          <div
+            className="text-base font-extrabold text-blue-700 font-mono mt-0.5 truncate"
+            title={`₩${grandTotal.overallRemaining.toLocaleString()}`}
+          >
             ₩{grandTotal.overallRemaining.toLocaleString()}
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs">
+        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs text-center">
           <span className="text-[11px] font-semibold text-indigo-700">누적 집행률</span>
           <div className="text-base font-black text-indigo-900 mt-0.5">
             {grandTotal.overallRate.toFixed(1)}%
+          </div>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+            <div
+              className={`h-full rounded-full ${
+                grandTotal.overallRate >= 80
+                  ? 'bg-emerald-500'
+                  : grandTotal.overallRate >= 40
+                  ? 'bg-amber-500'
+                  : 'bg-rose-500'
+              }`}
+              style={{ width: `${Math.min(100, grandTotal.overallRate)}%` }}
+            />
           </div>
         </div>
       </div>
@@ -716,7 +795,7 @@ export const GeneralSummaryView: React.FC = () => {
         >
           <table
             className="summary-print-table text-xs text-left border-collapse border border-slate-300 table-fixed print:w-full"
-            style={{ width: '2590px' }}
+            style={{ width: '2654px' }}
           >
             {/* 컬럼 폭을 고정해서 가로 스크롤 시에도 비목별 간격이 흔들리지 않게 함 */}
             <colgroup>
@@ -724,10 +803,10 @@ export const GeneralSummaryView: React.FC = () => {
               <col style={{ width: '78px' }} />
               <col style={{ width: '78px' }} />
               {/* 과제별 총계 컬럼 (맨 왼쪽, 인건비 앞으로 이동) */}
-              <col style={{ width: '96px' }} />
-              <col style={{ width: '96px' }} />
-              <col style={{ width: '96px' }} />
-              <col style={{ width: '56px' }} />
+              <col style={{ width: '116px' }} />
+              <col style={{ width: '116px' }} />
+              <col style={{ width: '116px' }} />
+              <col style={{ width: '60px' }} />
               {EXPENSE_CATEGORIES.map((cat) => (
                 <React.Fragment key={`colgrp_${cat}`}>
                   <col style={{ width: '80px' }} />
@@ -764,7 +843,7 @@ export const GeneralSummaryView: React.FC = () => {
                 {/* 과제별 총계 (맨 왼쪽 고정 영역) */}
                 <th
                   colSpan={4}
-                  className="border border-slate-300 border-r-2 border-r-slate-400 p-1.5 bg-indigo-100 text-indigo-950 font-extrabold sticky left-[202px] z-20"
+                  className="border border-slate-300 border-r-2 border-r-slate-400 p-1.5 bg-indigo-100 text-indigo-950 font-extrabold"
                 >
                   과제별 총계 (Total)
                 </th>
@@ -787,16 +866,16 @@ export const GeneralSummaryView: React.FC = () => {
               {/* Header Row 2 (Sub columns) */}
               <tr className="bg-slate-50 text-[10px] text-slate-600">
                 {/* Total Sub columns */}
-                <th className="border border-slate-300 p-1 text-right font-bold text-slate-900 bg-indigo-50 sticky left-[202px] z-20">
+                <th className="border border-slate-300 p-1 text-right font-bold text-slate-900 bg-indigo-50">
                   총 예산
                 </th>
-                <th className="border border-slate-300 p-1 text-right font-extrabold text-emerald-800 bg-indigo-50 sticky left-[298px] z-20">
+                <th className="border border-slate-300 p-1 text-right font-extrabold text-emerald-800 bg-indigo-50">
                   총 실적
                 </th>
-                <th className="border border-slate-300 p-1 text-right font-bold text-blue-800 bg-indigo-50 sticky left-[394px] z-20">
+                <th className="border border-slate-300 p-1 text-right font-bold text-blue-800 bg-indigo-50">
                   총 잔액
                 </th>
-                <th className="border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-extrabold text-indigo-900 bg-indigo-50 sticky left-[490px] z-20">
+                <th className="border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-extrabold text-indigo-900 bg-indigo-50">
                   집행률
                 </th>
 
@@ -862,17 +941,27 @@ export const GeneralSummaryView: React.FC = () => {
                         {src}
                       </span>
                     </td>
-                    <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold sticky left-[202px] z-20 ${rowBg}`}>
+                    <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold ${rowBg}`}>
                       ₩{gTot.overallBudget.toLocaleString()}
                     </td>
-                    <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-black text-emerald-800 sticky left-[298px] z-20 ${rowBg}`}>
+                    <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-black text-emerald-800 ${rowBg}`}>
                       ₩{gTot.overallExecuted.toLocaleString()}
                     </td>
-                    <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-blue-800 sticky left-[394px] z-20 ${rowBg}`}>
+                    <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-blue-800 ${rowBg}`}>
                       ₩{gTot.overallRemaining.toLocaleString()}
                     </td>
-                    <td className={`border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-black text-indigo-900 sticky left-[490px] z-20 ${rowBg}`}>
-                      {gTot.overallRate.toFixed(1)}%
+                    <td className={`border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-black text-indigo-900 ${rowBg}`}>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span>{gTot.overallRate.toFixed(1)}%</span>
+                        <div className="h-1 w-9 rounded-full bg-slate-200/70 overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${
+                              gTot.overallRate >= 80 ? 'bg-emerald-500' : gTot.overallRate >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${Math.min(100, gTot.overallRate)}%` }}
+                          />
+                        </div>
+                      </div>
                     </td>
                     {EXPENSE_CATEGORIES.map((cat) => {
                       const catTot = gTot.categoryTotals[cat];
@@ -924,17 +1013,27 @@ export const GeneralSummaryView: React.FC = () => {
                           const tot = getDomainTotalData(group.tasks);
                           return (
                             <>
-                              <td className="border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-slate-900 bg-slate-200 sticky left-[202px] z-20">
+                              <td className="border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-slate-900 bg-slate-200">
                                 ₩{tot.totalBudget.toLocaleString()}
                               </td>
-                              <td className="border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-emerald-800 bg-slate-200 sticky left-[298px] z-20">
+                              <td className="border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-extrabold text-emerald-800 bg-slate-200">
                                 ₩{tot.totalExecuted.toLocaleString()}
                               </td>
-                              <td className="border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-blue-800 bg-slate-200 sticky left-[394px] z-20">
+                              <td className="border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-blue-800 bg-slate-200">
                                 ₩{tot.remaining.toLocaleString()}
                               </td>
-                              <td className="border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-indigo-900 bg-slate-200 sticky left-[490px] z-20">
-                                {tot.rate.toFixed(1)}%
+                              <td className="border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-indigo-900 bg-slate-200">
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span>{tot.rate.toFixed(1)}%</span>
+                                  <div className="h-1 w-9 rounded-full bg-slate-200/70 overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        tot.rate >= 80 ? 'bg-emerald-500' : tot.rate >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                                      }`}
+                                      style={{ width: `${Math.min(100, tot.rate)}%` }}
+                                    />
+                                  </div>
+                                </div>
                               </td>
                             </>
                           );
@@ -962,9 +1061,16 @@ export const GeneralSummaryView: React.FC = () => {
                       </tr>
                     )}
 
-                    {/* 영역별 요약 모드: 재원별 4행으로 펼쳐서 보여줌 */}
+                    {/* 영역별 요약 모드: 재원별 행으로 펼쳐서 보여줌 (표시방식: 3재원 상세/합계 요약 반영) */}
                     {viewGranularity === 'domain' &&
-                      (['이월금', '기본사업비', '적정규모화', '합계'] as const).map((src, sIdx) => {
+                      (() => {
+                        const domainSources: (FundSource | '합계')[] =
+                          displayMode === 'detailed'
+                            ? ['이월금', '기본사업비', '적정규모화', '합계']
+                            : ['합계'];
+                        const domainRowSpanCount = domainSources.length;
+
+                        return domainSources.map((src, sIdx) => {
                         const isTotal = src === '합계';
                         const fundSrc = isTotal ? undefined : src;
                         const fundColor = getFundColorTheme(src);
@@ -976,7 +1082,7 @@ export const GeneralSummaryView: React.FC = () => {
                             {sIdx === 0 && (
                               <>
                                 <td
-                                  rowSpan={4}
+                                  rowSpan={domainRowSpanCount}
                                   className="border border-slate-300 p-1 text-center sticky left-0 z-20 bg-white"
                                 >
                                   <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-mono overflow-hidden text-ellipsis whitespace-nowrap font-bold ${domainColor.badge}`}>
@@ -984,7 +1090,7 @@ export const GeneralSummaryView: React.FC = () => {
                                   </span>
                                 </td>
                                 <td
-                                  rowSpan={4}
+                                  rowSpan={domainRowSpanCount}
                                   className={`border border-slate-300 p-1.5 text-center text-xs font-bold text-slate-900 sticky left-[46px] z-20 ${domainColor.bg}`}
                                 >
                                   {group.domainName.replace(/\s*\(.*\)$/, '')}
@@ -996,17 +1102,27 @@ export const GeneralSummaryView: React.FC = () => {
                                 {src}
                               </span>
                             </td>
-                            <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-slate-900 sticky left-[202px] z-20 ${isTotal ? 'bg-indigo-50' : 'bg-white'}`}>
+                            <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-slate-900 ${isTotal ? 'bg-indigo-50' : 'bg-white'}`}>
                               ₩{tot.totalBudget.toLocaleString()}
                             </td>
-                            <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-emerald-800 sticky left-[298px] z-20 ${isTotal ? 'bg-indigo-50' : 'bg-white'}`}>
+                            <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-emerald-800 ${isTotal ? 'bg-indigo-50' : 'bg-white'}`}>
                               ₩{tot.totalExecuted.toLocaleString()}
                             </td>
-                            <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-blue-800 sticky left-[394px] z-20 ${isTotal ? 'bg-indigo-50' : 'bg-white'}`}>
+                            <td className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold text-blue-800 ${isTotal ? 'bg-indigo-50' : 'bg-white'}`}>
                               ₩{tot.remaining.toLocaleString()}
                             </td>
-                            <td className={`border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-extrabold text-indigo-900 sticky left-[490px] z-20 ${isTotal ? 'bg-indigo-50' : 'bg-white'}`}>
-                              {tot.rate.toFixed(1)}%
+                            <td className={`border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-extrabold text-indigo-900 ${isTotal ? 'bg-indigo-50' : 'bg-white'}`}>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span>{tot.rate.toFixed(1)}%</span>
+                                <div className="h-1 w-9 rounded-full bg-slate-200/70 overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full ${
+                                      tot.rate >= 80 ? 'bg-emerald-500' : tot.rate >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                                    }`}
+                                    style={{ width: `${Math.min(100, tot.rate)}%` }}
+                                  />
+                                </div>
+                              </div>
                             </td>
                             {EXPENSE_CATEGORIES.map((cat) => {
                               const c = getDomainCellData(group.tasks, cat, fundSrc);
@@ -1035,7 +1151,8 @@ export const GeneralSummaryView: React.FC = () => {
                             })}
                           </tr>
                         );
-                      })}
+                      });
+                      })()}
 
                     {/* Task Rows inside domain (viewGranularity==='detail'일 때만) */}
                     {viewGranularity === 'detail' &&
@@ -1098,32 +1215,42 @@ export const GeneralSummaryView: React.FC = () => {
 
                                 {/* Total Columns (맨 왼쪽으로 이동) */}
                                 <td
-                                  className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold sticky left-[202px] z-20 ${
+                                  className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold ${
                                     isTotal ? 'text-slate-900 bg-indigo-50' : 'text-slate-700 bg-white'
                                   }`}
                                 >
                                   ₩{taskTot.totalBudget.toLocaleString()}
                                 </td>
                                 <td
-                                  className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold sticky left-[298px] z-20 ${
+                                  className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold ${
                                     isTotal ? 'text-emerald-800 bg-indigo-50' : 'text-emerald-700 bg-white'
                                   }`}
                                 >
                                   ₩{taskTot.totalExecuted.toLocaleString()}
                                 </td>
                                 <td
-                                  className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold sticky left-[394px] z-20 ${
+                                  className={`border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-bold ${
                                     isTotal ? 'text-blue-800 bg-indigo-50' : 'text-blue-700 bg-white'
                                   }`}
                                 >
                                   ₩{taskTot.remaining.toLocaleString()}
                                 </td>
                                 <td
-                                  className={`border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-extrabold sticky left-[490px] z-20 ${
+                                  className={`border border-slate-300 border-r-2 border-r-slate-400 p-1 text-center font-mono overflow-hidden text-ellipsis whitespace-nowrap text-[11px] font-extrabold ${
                                     isTotal ? 'text-indigo-900 bg-indigo-50' : 'text-slate-700 bg-white'
                                   }`}
                                 >
-                                  {taskTot.rate.toFixed(1)}%
+                                  <div className="flex flex-col items-center gap-0.5">
+                                    <span>{taskTot.rate.toFixed(1)}%</span>
+                                    <div className="h-1 w-9 rounded-full bg-slate-200/70 overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          taskTot.rate >= 80 ? 'bg-emerald-500' : taskTot.rate >= 40 ? 'bg-amber-500' : 'bg-rose-500'
+                                        }`}
+                                        style={{ width: `${Math.min(100, taskTot.rate)}%` }}
+                                      />
+                                    </div>
+                                  </div>
                                 </td>
 
                                 {/* 7 Categories Cells */}

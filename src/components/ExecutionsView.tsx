@@ -82,7 +82,7 @@ export const ExecutionsView: React.FC = () => {
   const [selectedCategoryFilterExec, setSelectedCategoryFilterExec] = useState<string>('ALL');
 
   // Sorting State
-  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [sortKey, setSortKey] = useState<SortKey>('created_at');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // New Execution Modal
@@ -561,17 +561,23 @@ export const ExecutionsView: React.FC = () => {
 
         {/* Second Row: 정렬 + 영역/세부과제/비목 필터 (표테이블 헤더 필터 대체) */}
         <div className="flex flex-wrap items-center gap-3 pt-2.5 mt-2.5 border-t border-slate-100 text-xs w-full">
-          {/* 집행일자 정렬 */}
+          {/* 정렬 기준 + 방향 */}
           <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-600">집행일자:</span>
+            <span className="font-semibold text-slate-600">정렬:</span>
+            <select
+              value={sortKey === 'manageNo' || sortKey === 'date' || sortKey === 'created_at' ? sortKey : 'created_at'}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="created_at">등록일순 (정렬없음, 기본)</option>
+              <option value="date">집행일자순</option>
+              <option value="manageNo">관리연번순 (IA001~IZ999)</option>
+            </select>
             <button
-              onClick={() => {
-                setSortKey('date');
-                setSortDirection((prev) => (sortKey === 'date' && prev === 'asc' ? 'desc' : 'asc'));
-              }}
+              onClick={() => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
               className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              {sortKey === 'date' && sortDirection === 'asc' ? (
+              {sortDirection === 'asc' ? (
                 <>
                   <ArrowUp className="h-3 w-3" />
                   오름차순

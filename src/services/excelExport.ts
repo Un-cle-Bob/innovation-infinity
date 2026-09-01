@@ -104,10 +104,11 @@ export function exportSummaryGridToExcel(
   summaryRows: any[],
   categories: string[],
   year: number,
-  periodLabel: string
+  periodLabel: string,
+  variant: '세부과제별' | '영역별요약' = '세부과제별'
 ) {
-  // 1행: 영역코드 | 세부과제코드 | 재원구분 | [비목명(4칸 병합)] × N | 총예산 | 총실적 | 총잔액 | 집행률(%)
-  const headerRow1: (string | number)[] = ['영역코드', '세부과제코드', '재원구분'];
+  // 1행: 영역코드 | 세부과제코드(또는 영역명) | 재원구분 | [비목명(4칸 병합)] × N | 총예산 | 총실적 | 총잔액 | 집행률(%)
+  const headerRow1: (string | number)[] = ['영역코드', variant === '영역별요약' ? '영역명' : '세부과제코드', '재원구분'];
   categories.forEach((cat) => {
     headerRow1.push(cat, '', '', '');
   });
@@ -170,8 +171,8 @@ export function exportSummaryGridToExcel(
   (worksheet as any)['!freeze'] = { xSplit: 3, ySplit: 2 };
 
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, `${year}년_사업비총괄표`);
+  XLSX.utils.book_append_sheet(workbook, worksheet, `${year}년_사업비총괄표_${variant}`.slice(0, 31));
 
-  const filename = `대학혁신지원사업_${year}학년도_사업비총괄표_${periodLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  const filename = `대학혁신지원사업_${year}학년도_사업비총괄표_${variant}_${periodLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`;
   XLSX.writeFile(workbook, filename);
 }

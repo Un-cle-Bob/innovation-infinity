@@ -24,8 +24,8 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
     { id: 'dashboard', label: '종합 대시보드', icon: LayoutDashboard },
     { id: 'tasks', label: '예산 관리', icon: FolderTree },
     { id: 'executions', label: '집행 관리', icon: ReceiptText },
-    { id: 'summary', label: '사업비 총괄표', icon: Table },
     { id: 'programs', label: '실적 관리', icon: Target },
+    { id: 'summary', label: '사업비 총괄표', icon: Table },
     { id: 'kpi', label: '성과지표 (KPI)', icon: LineChart },
     { id: 'reports', label: '보고서 인쇄/PDF', icon: Printer },
     {

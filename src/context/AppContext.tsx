@@ -71,6 +71,11 @@ interface AppContextType {
   ) => void;
   updateItemStatus: (taskCode: string, itemCode: string, status: ItemStatus, note?: string) => void;
   updateItem: (taskCode: string, itemCode: string, name: string, department: string) => void;
+  addTask: (domain: string, code: string, name: string, detail: string) => boolean;
+  updateTaskInfo: (taskCode: string, name: string, detail: string) => void;
+  deleteTask: (taskCode: string) => void;
+  addItem: (taskCode: string, itemCode: string, name: string, department: string) => boolean;
+  deleteItem: (taskCode: string, itemCode: string) => void;
 
   // Execution Actions (4절, 5절, 6절)
   addExecution: (exec: Omit<Execution, 'id' | 'created_at' | 'created_by' | 'fund_allocations'>) => {
@@ -455,6 +460,98 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
+  /**
+   * 세부과제 신규 추가 (예산은 0원 매트릭스로 시작, 예산관리 화면에서 편집)
+   */
+  const addTask = (domain: string, code: string, name: string, detail: string) => {
+    let created = false;
+    mutateYearData((prev) => {
+      if (prev.tasks[code]) return prev; // 이미 같은 코드가 있으면 무시
+      created = true;
+      const newTask: Task = {
+        code,
+        domain,
+        detail,
+        name,
+        budget_total: 0,
+        budget_matrix: {},
+        items: {},
+      };
+      return { ...prev, tasks: { ...prev.tasks, [code]: newTask } };
+    });
+    if (created) {
+      showToast(`세부과제 [${code}]가 추가되었습니다.`, 'success');
+    } else {
+      showToast(`세부과제 코드 [${code}]가 이미 존재합니다.`, 'error');
+    }
+    return created;
+  };
+
+  /**
+   * 세부과제 이름/설명 수정 (예산 매트릭스는 별도 updateTaskMatrix 사용)
+   */
+  const updateTaskInfo = (taskCode: string, name: string, detail: string) => {
+    mutateYearData((prev) => {
+      const target = prev.tasks[taskCode];
+      if (!target) return prev;
+      return { ...prev, tasks: { ...prev.tasks, [taskCode]: { ...target, name, detail } } };
+    });
+    showToast(`세부과제 [${taskCode}] 정보가 수정되었습니다.`, 'success');
+  };
+
+  const deleteTask = (taskCode: string) => {
+    mutateYearData((prev) => {
+      const next = { ...prev.tasks };
+      delete next[taskCode];
+      return { ...prev, tasks: next };
+    });
+    showToast(`세부과제 [${taskCode}]가 삭제되었습니다.`, 'success');
+  };
+
+  /**
+   * 주요추진항목 신규 추가 (진행상황은 '예정'으로 시작)
+   */
+  const addItem = (taskCode: string, itemCode: string, name: string, department: string) => {
+    let created = false;
+    mutateYearData((prev) => {
+      const task = prev.tasks[taskCode];
+      if (!task || task.items[itemCode]) return prev;
+      created = true;
+      const newItem: TaskItem = {
+        code: itemCode,
+        task_code: taskCode,
+        name,
+        department,
+        status: '예정',
+        status_history: [],
+      };
+      return {
+        ...prev,
+        tasks: {
+          ...prev.tasks,
+          [taskCode]: { ...task, items: { ...task.items, [itemCode]: newItem } },
+        },
+      };
+    });
+    if (created) {
+      showToast(`주요추진항목 [${itemCode}]가 추가되었습니다.`, 'success');
+    } else {
+      showToast(`주요추진항목 코드 [${itemCode}]가 이미 존재하거나 세부과제를 찾을 수 없습니다.`, 'error');
+    }
+    return created;
+  };
+
+  const deleteItem = (taskCode: string, itemCode: string) => {
+    mutateYearData((prev) => {
+      const task = prev.tasks[taskCode];
+      if (!task) return prev;
+      const nextItems = { ...task.items };
+      delete nextItems[itemCode];
+      return { ...prev, tasks: { ...prev.tasks, [taskCode]: { ...task, items: nextItems } } };
+    });
+    showToast(`주요추진항목 [${itemCode}]가 삭제되었습니다.`, 'success');
+  };
+
   // Execution Mutations (4절, 5절, 6절)
   const addExecution = (
     execData: Omit<Execution, 'id' | 'created_at' | 'created_by' | 'fund_allocations'>
@@ -701,10 +798,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id,
       updated_at: new Date().toISOString(),
     };
-    mutateYearData((prev) => ({
-      ...prev,
-      programs: { ...prev.programs, [id]: newProg },
-    }));
+    mutateYearData((prev) => {
+      // 3번 요청: 세부프로그램을 등록하면, 소속된 주요추진항목이 '예정' 상태일 경우 자동으로 '진행중'으로 전환
+      let nextTasks = prev.tasks;
+      const task = prev.tasks[progData.task_code];
+      const item = task?.items?.[progData.item_code];
+      if (task && item && item.status === '예정') {
+        const history = item.status_history || [];
+        nextTasks = {
+          ...prev.tasks,
+          [progData.task_code]: {
+            ...task,
+            items: {
+              ...task.items,
+              [progData.item_code]: {
+                ...item,
+                status: '진행중',
+                status_history: [
+                  ...history,
+                  {
+                    status: '진행중',
+                    changed_at: new Date().toISOString(),
+                    changed_by: currentUser.name,
+                    note: '세부프로그램 등록으로 자동 변경',
+                  },
+                ],
+              },
+            },
+          },
+        };
+      }
+      return {
+        ...prev,
+        programs: { ...prev.programs, [id]: newProg },
+        tasks: nextTasks,
+      };
+    });
     showToast('세부프로그램이 등록되었습니다.', 'success');
   };
 
@@ -941,6 +1070,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateItemBudgetMatrix,
         updateItemStatus,
         updateItem,
+        addTask,
+        updateTaskInfo,
+        deleteTask,
+        addItem,
+        deleteItem,
         addExecution,
         updateExecution,
         deleteExecution,

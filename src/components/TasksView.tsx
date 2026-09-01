@@ -30,6 +30,9 @@ import {
   LayoutGrid,
   Upload,
   Download,
+  Plus,
+  Trash2,
+  Target,
 } from 'lucide-react';
 
 export const TasksView: React.FC = () => {
@@ -37,15 +40,47 @@ export const TasksView: React.FC = () => {
     currentYear,
     tasks,
     executions,
+    programs,
     departments,
     updateTaskMatrix,
     updateItemBudgetMatrix,
     updateItemStatus,
     updateItem,
+    addTask,
+    updateTaskInfo,
+    deleteTask,
+    addItem,
+    deleteItem,
     canEditTab,
+    canDeleteTab,
   } = useApp();
 
   const canEditTasks = canEditTab('tasks');
+  const canDeleteTasks = canDeleteTab('tasks');
+
+  // 세부과제 추가/수정 모달 상태
+  const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
+  const [newTaskDomain, setNewTaskDomain] = useState('IA');
+  const [newTaskCode, setNewTaskCode] = useState('');
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskDetail, setNewTaskDetail] = useState('');
+
+  const [editingTaskCode, setEditingTaskCode] = useState<string | null>(null);
+  const [editTaskName, setEditTaskName] = useState('');
+  const [editTaskDetail, setEditTaskDetail] = useState('');
+
+  // 주요추진항목 추가/수정 상태
+  const [addingItemToTask, setAddingItemToTask] = useState<string | null>(null);
+  const [newItemCode, setNewItemCode] = useState('');
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemDept, setNewItemDept] = useState('');
+
+  const [editingItemKey, setEditingItemKey] = useState<string | null>(null); // `${taskCode}::${itemCode}`
+  const [editItemName, setEditItemName] = useState('');
+  const [editItemDept, setEditItemDept] = useState('');
+
+  // 항목별 "관련 실적 요약" 펼치기 상태
+  const [expandedItemKey, setExpandedItemKey] = useState<string | null>(null);
 
   // 엑셀 업로드(예산 일괄편집) 상태
   const budgetImportFileRef = React.useRef<HTMLInputElement>(null);
@@ -212,6 +247,80 @@ export const TasksView: React.FC = () => {
     setBudgetImportResult(null);
   };
 
+  // 세부과제 추가/수정/삭제 핸들러
+  const handleOpenAddTaskModal = () => {
+    setNewTaskDomain('IA');
+    setNewTaskCode('');
+    setNewTaskName('');
+    setNewTaskDetail('');
+    setIsAddTaskModalOpen(true);
+  };
+
+  const handleSubmitAddTask = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTaskCode.trim() || !newTaskName.trim()) return;
+    const ok = addTask(newTaskDomain, newTaskCode.trim(), newTaskName.trim(), newTaskDetail.trim());
+    if (ok) setIsAddTaskModalOpen(false);
+  };
+
+  const handleStartEditTask = (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setEditingTaskCode(task.code);
+    setEditTaskName(task.name);
+    setEditTaskDetail(task.detail || '');
+  };
+
+  const handleSaveEditTask = () => {
+    if (!editingTaskCode || !editTaskName.trim()) return;
+    updateTaskInfo(editingTaskCode, editTaskName.trim(), editTaskDetail.trim());
+    setEditingTaskCode(null);
+  };
+
+  const handleDeleteTask = (task: Task, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const itemCount = Object.keys(task.items || {}).length;
+    const msg =
+      itemCount > 0
+        ? `[${task.code}] ${task.name}\n주요추진항목 ${itemCount}개가 함께 삭제됩니다. 정말 삭제하시겠습니까?\n(이미 등록된 집행내역/실적은 삭제되지 않고 남아있을 수 있으니 주의하세요)`
+        : `[${task.code}] ${task.name}을(를) 삭제하시겠습니까?`;
+    if (confirm(msg)) {
+      deleteTask(task.code);
+    }
+  };
+
+  // 주요추진항목 추가/수정/삭제 핸들러
+  const handleOpenAddItemForm = (taskCode: string) => {
+    setNewItemCode('');
+    setNewItemName('');
+    setNewItemDept(departments[0]?.name || '');
+    setAddingItemToTask(taskCode);
+  };
+
+  const handleSubmitAddItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addingItemToTask || !newItemCode.trim() || !newItemName.trim()) return;
+    const ok = addItem(addingItemToTask, newItemCode.trim(), newItemName.trim(), newItemDept);
+    if (ok) setAddingItemToTask(null);
+  };
+
+  const handleStartEditItem = (taskCode: string, item: TaskItem) => {
+    setEditingItemKey(`${taskCode}::${item.code}`);
+    setEditItemName(item.name);
+    setEditItemDept(item.department);
+  };
+
+  const handleSaveEditItem = (taskCode: string, itemCode: string) => {
+    if (!editItemName.trim()) return;
+    updateItem(taskCode, itemCode, editItemName.trim(), editItemDept);
+    setEditingItemKey(null);
+  };
+
+  const handleDeleteItem = (taskCode: string, item: TaskItem) => {
+    if (confirm(`[${item.code}] ${item.name}을(를) 삭제하시겠습니까?`)) {
+      deleteItem(taskCode, item.code);
+    }
+  };
+
   const handleOpenMatrixModal = (task: Task) => {
     setEditingTask(task);
     setTempMatrix(JSON.parse(JSON.stringify(task.budget_matrix || {})));
@@ -330,6 +439,14 @@ export const TasksView: React.FC = () => {
           {/* 예산 엑셀 일괄편집 (IZ 영역 제외) */}
           {canEditTasks && (
             <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleOpenAddTaskModal}
+                className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-indigo-700 transition-colors shadow-xs"
+                title="새 세부과제 추가"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>세부과제 추가</span>
+              </button>
               <button
                 onClick={handleDownloadBudgetTemplate}
                 className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
@@ -451,7 +568,7 @@ export const TasksView: React.FC = () => {
                           <ChevronRight className="h-4 w-4" />
                         )}
                       </div>
-                      <div>
+                      <div className="flex-1 min-w-0" onClick={(e) => editingTaskCode === task.code && e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <span
                             className={`rounded-md px-2 py-0.5 text-xs font-mono font-extrabold border ${domainTheme.badge}`}
@@ -462,11 +579,69 @@ export const TasksView: React.FC = () => {
                             [{task.domain}]
                           </span>
                         </div>
-                        <h3 className="text-sm font-bold text-slate-900 mt-1">{task.name}</h3>
-                        {task.detail && (
-                          <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{task.detail}</p>
+                        {editingTaskCode === task.code ? (
+                          <div className="mt-1.5 space-y-1.5 max-w-md">
+                            <input
+                              type="text"
+                              value={editTaskName}
+                              onChange={(e) => setEditTaskName(e.target.value)}
+                              placeholder="세부과제명"
+                              className="w-full rounded-md border border-indigo-300 px-2 py-1 text-sm font-bold"
+                              autoFocus
+                            />
+                            <input
+                              type="text"
+                              value={editTaskDetail}
+                              onChange={(e) => setEditTaskDetail(e.target.value)}
+                              placeholder="세부내용 (선택)"
+                              className="w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={handleSaveEditTask}
+                                className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-semibold text-white hover:bg-emerald-700"
+                              >
+                                <Check className="h-3 w-3" />
+                                저장
+                              </button>
+                              <button
+                                onClick={() => setEditingTaskCode(null)}
+                                className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700 hover:bg-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                                취소
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <h3 className="text-sm font-bold text-slate-900 mt-1">{task.name}</h3>
+                            {task.detail && (
+                              <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{task.detail}</p>
+                            )}
+                          </>
                         )}
                       </div>
+                      {canEditTasks && editingTaskCode !== task.code && (
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            onClick={(e) => handleStartEditTask(task, e)}
+                            className="rounded-md p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+                            title="세부과제명/내용 수정"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                          {canDeleteTasks && (
+                            <button
+                              onClick={(e) => handleDeleteTask(task, e)}
+                              className="rounded-md p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                              title="세부과제 삭제"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Budget & Execution Stats */}
@@ -493,6 +668,18 @@ export const TasksView: React.FC = () => {
                             ({summary.execution_rate.toFixed(1)}%)
                           </span>
                         </span>
+                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-slate-200">
+                          <div
+                            className={`h-full rounded-full ${
+                              summary.execution_rate >= 80
+                                ? 'bg-emerald-500'
+                                : summary.execution_rate >= 40
+                                ? 'bg-amber-500'
+                                : 'bg-rose-500'
+                            }`}
+                            style={{ width: `${Math.min(100, summary.execution_rate)}%` }}
+                          />
+                        </div>
                       </div>
 
                       {canEditTab('tasks') && (
@@ -603,10 +790,74 @@ export const TasksView: React.FC = () => {
                               주요추진항목 및 실행부서별 추진현황 ({itemsList.length}개)
                             </h4>
                           </div>
+                          {canEditTasks && (
+                            <button
+                              onClick={() => handleOpenAddItemForm(task.code)}
+                              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-700"
+                            >
+                              <Plus className="h-3 w-3" />
+                              항목 추가
+                            </button>
+                          )}
                         </div>
 
+                        {/* 항목 추가 인라인 폼 */}
+                        {addingItemToTask === task.code && (
+                          <form
+                            onSubmit={handleSubmitAddItem}
+                            className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-emerald-300 bg-emerald-50/50 p-2.5"
+                          >
+                            <input
+                              type="text"
+                              value={newItemCode}
+                              onChange={(e) => setNewItemCode(e.target.value)}
+                              placeholder={`코드 (예: ${task.code}-1)`}
+                              className="w-36 rounded-md border border-slate-300 px-2 py-1 text-xs font-mono"
+                              required
+                            />
+                            <input
+                              type="text"
+                              value={newItemName}
+                              onChange={(e) => setNewItemName(e.target.value)}
+                              placeholder="주요추진항목 내용"
+                              className="flex-1 min-w-[160px] rounded-md border border-slate-300 px-2 py-1 text-xs"
+                              required
+                            />
+                            <select
+                              value={newItemDept}
+                              onChange={(e) => setNewItemDept(e.target.value)}
+                              className="rounded-md border border-slate-300 px-2 py-1 text-xs"
+                            >
+                              {departments.map((d) => (
+                                <option key={d.id} value={d.name}>
+                                  {d.name}
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              type="submit"
+                              className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+                            >
+                              추가
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setAddingItemToTask(null)}
+                              className="rounded-md bg-slate-200 px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-300"
+                            >
+                              취소
+                            </button>
+                          </form>
+                        )}
+
                         <div className="mt-3 space-y-2">
-                          {itemsList.map((item) => (
+                          {itemsList.map((item) => {
+                            const itemKey = `${task.code}::${item.code}`;
+                            const isEditingItem = editingItemKey === itemKey;
+                            const isExpandedItem = expandedItemKey === itemKey;
+                            const linkedPrograms = programs.filter((p) => p.item_code === item.code);
+
+                            return (
                             <div
                               key={item.code}
                               className={`flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-start sm:justify-between ${
@@ -615,20 +866,118 @@ export const TasksView: React.FC = () => {
                                   : 'border-slate-100 bg-slate-50/60'
                               }`}
                             >
-                              <div className="flex items-start gap-2.5">
+                              <div className="flex items-start gap-2.5 flex-1 min-w-0">
                                 <span className="rounded-md bg-white border border-slate-200 px-2 py-0.5 text-xs font-mono font-bold text-slate-700 shrink-0">
                                   {item.code}
                                 </span>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-bold text-slate-900">{item.name}</span>
-                                    <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
-                                      <Building className="h-3 w-3" />
-                                      {item.department}
-                                    </span>
-                                  </div>
-                                  {item.detail && (
-                                    <p className="text-xs text-slate-500 mt-0.5">{item.detail}</p>
+                                <div className="flex-1 min-w-0">
+                                  {isEditingItem ? (
+                                    <div className="space-y-1.5 max-w-sm">
+                                      <input
+                                        type="text"
+                                        value={editItemName}
+                                        onChange={(e) => setEditItemName(e.target.value)}
+                                        className="w-full rounded-md border border-indigo-300 px-2 py-1 text-xs font-bold"
+                                        autoFocus
+                                      />
+                                      <select
+                                        value={editItemDept}
+                                        onChange={(e) => setEditItemDept(e.target.value)}
+                                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
+                                      >
+                                        {departments.map((d) => (
+                                          <option key={d.id} value={d.name}>
+                                            {d.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          onClick={() => handleSaveEditItem(task.code, item.code)}
+                                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[10px] font-bold text-white hover:bg-emerald-700"
+                                        >
+                                          <Check className="h-3 w-3" />
+                                          저장
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingItemKey(null)}
+                                          className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-1 text-[10px] font-bold text-slate-700 hover:bg-slate-300"
+                                        >
+                                          <X className="h-3 w-3" />
+                                          취소
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <button
+                                          onClick={() =>
+                                            setExpandedItemKey(isExpandedItem ? null : itemKey)
+                                          }
+                                          className="text-xs font-bold text-slate-900 hover:text-indigo-700 hover:underline text-left"
+                                          title="관련 실적(세부프로그램) 요약 보기"
+                                        >
+                                          {item.name}
+                                        </button>
+                                        <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                                          <Building className="h-3 w-3" />
+                                          {item.department}
+                                        </span>
+                                        {linkedPrograms.length > 0 && (
+                                          <button
+                                            onClick={() =>
+                                              setExpandedItemKey(isExpandedItem ? null : itemKey)
+                                            }
+                                            className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 border border-emerald-200 hover:bg-emerald-100"
+                                          >
+                                            <Target className="h-3 w-3" />
+                                            관련 실적 {linkedPrograms.length}건
+                                          </button>
+                                        )}
+                                      </div>
+                                      {item.detail && (
+                                        <p className="text-xs text-slate-500 mt-0.5">{item.detail}</p>
+                                      )}
+                                    </>
+                                  )}
+
+                                  {/* 관련 실적(세부프로그램) 요약 패널 */}
+                                  {isExpandedItem && !isEditingItem && (
+                                    <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50/40 p-2.5 space-y-1.5">
+                                      {linkedPrograms.length === 0 ? (
+                                        <p className="text-[11px] text-slate-500">
+                                          이 항목에 연결된 세부프로그램이 아직 없습니다.
+                                        </p>
+                                      ) : (
+                                        linkedPrograms.map((p) => (
+                                          <div
+                                            key={p.id}
+                                            className="flex items-center justify-between gap-2 rounded bg-white border border-emerald-100 px-2 py-1 text-[11px]"
+                                          >
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                              <span
+                                                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold border ${getStatusColor(
+                                                  p.status
+                                                )}`}
+                                              >
+                                                {p.status}
+                                              </span>
+                                              <span className="font-semibold text-slate-800 truncate">
+                                                {p.name}
+                                                {p.round_label ? ` (${p.round_label})` : ''}
+                                              </span>
+                                            </div>
+                                            <div className="shrink-0 text-slate-500">
+                                              참여 {p.performance?.participants ?? 0}명
+                                              {p.performance?.satisfaction_score
+                                                ? ` · 만족도 ${p.performance.satisfaction_score.toFixed(1)}`
+                                                : ''}
+                                            </div>
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
                                   )}
 
                                   {/* IZ 영역처럼 항목별 예산이 별도로 있는 경우: 항목 고유 예산 요약 + 편집 */}
@@ -685,7 +1034,6 @@ export const TasksView: React.FC = () => {
                                       task.code,
                                       item.code,
                                       e.target.value as ItemStatus,
-                                      '관리자',
                                       '진행상태 갱신'
                                     )
                                   }
@@ -706,9 +1054,29 @@ export const TasksView: React.FC = () => {
                                 >
                                   <History className="h-3.5 w-3.5" />
                                 </button>
+
+                                {canEditTasks && !isEditingItem && (
+                                  <button
+                                    onClick={() => handleStartEditItem(task.code, item)}
+                                    className="rounded-lg p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                    title="항목명/부서 수정"
+                                  >
+                                    <Edit3 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                                {canDeleteTasks && !isEditingItem && (
+                                  <button
+                                    onClick={() => handleDeleteItem(task.code, item)}
+                                    className="rounded-lg p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                                    title="항목 삭제"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
                               </div>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     </div>
@@ -909,6 +1277,94 @@ export const TasksView: React.FC = () => {
               );
             })
           )}
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 3-C. 세부과제 추가 모달 */}
+      {/* ========================================================= */}
+      {isAddTaskModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <h3 className="text-base font-bold text-slate-900">세부과제 추가</h3>
+              <button
+                onClick={() => setIsAddTaskModalOpen(false)}
+                className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleSubmitAddTask} className="space-y-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">영역</label>
+                <select
+                  value={newTaskDomain}
+                  onChange={(e) => setNewTaskDomain(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                >
+                  <option value="IA">교육혁신 (IA)</option>
+                  <option value="IB">고등직업교육혁신 (IB)</option>
+                  <option value="IC">산학혁신 (IC)</option>
+                  <option value="ID">지역협력혁신 (ID)</option>
+                  <option value="IE">자율혁신 (IE)</option>
+                  <option value="IZ">사업관리 (IZ)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  세부과제 코드 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newTaskCode}
+                  onChange={(e) => setNewTaskCode(e.target.value)}
+                  placeholder={`예: ${newTaskDomain}-6-1`}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  세부과제명 <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">세부내용 (선택)</label>
+                <input
+                  type="text"
+                  value={newTaskDetail}
+                  onChange={(e) => setNewTaskDetail(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+              <p className="text-[11px] text-slate-400">
+                예산은 0원으로 시작합니다. 추가 후 예산관리 화면에서 비목×재원 매트릭스를 편집해주세요.
+              </p>
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsAddTaskModalOpen(false)}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="submit"
+                  className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 shadow-xs"
+                >
+                  추가
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
