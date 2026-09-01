@@ -80,6 +80,7 @@ export const ExecutionsView: React.FC = () => {
   const [selectedDomainFilterExec, setSelectedDomainFilterExec] = useState<string>('ALL');
   const [selectedTaskFilterExec, setSelectedTaskFilterExec] = useState<string>('ALL');
   const [selectedCategoryFilterExec, setSelectedCategoryFilterExec] = useState<string>('ALL');
+  const [selectedSubCategoryFilterExec, setSelectedSubCategoryFilterExec] = useState<string>('ALL');
 
   // Sorting State
   const [sortKey, setSortKey] = useState<SortKey>('created_at');
@@ -139,6 +140,15 @@ export const ExecutionsView: React.FC = () => {
     return Array.from(set).sort();
   }, [executions]);
 
+  // Available unique sub-categories (세목) for filtering — 프리셋 목록 + 실제 데이터에 있는 직접입력 값까지 포함
+  const availableSubCategories = useMemo(() => {
+    const set = new Set<string>(SUB_CATEGORY_OPTIONS);
+    executions.forEach((e) => {
+      if (e.sub_category) set.add(e.sub_category);
+    });
+    return Array.from(set).sort();
+  }, [executions]);
+
   // Filtered and Sorted Executions
   const processedExecutions = useMemo(() => {
     let result = executions.filter((exec) => {
@@ -156,6 +166,7 @@ export const ExecutionsView: React.FC = () => {
       if (selectedDomainFilterExec !== 'ALL' && domainCode !== selectedDomainFilterExec) return false;
       if (selectedTaskFilterExec !== 'ALL' && exec.task_code !== selectedTaskFilterExec) return false;
       if (selectedCategoryFilterExec !== 'ALL' && exec.category !== selectedCategoryFilterExec) return false;
+      if (selectedSubCategoryFilterExec !== 'ALL' && (exec.sub_category || '') !== selectedSubCategoryFilterExec) return false;
 
       // Search Query
       if (searchQuery.trim() !== '') {
@@ -203,6 +214,7 @@ export const ExecutionsView: React.FC = () => {
     selectedDomainFilterExec,
     selectedTaskFilterExec,
     selectedCategoryFilterExec,
+    selectedSubCategoryFilterExec,
     searchQuery,
     sortKey,
     sortDirection,
@@ -373,7 +385,8 @@ export const ExecutionsView: React.FC = () => {
     (selectedDeptFilter !== 'ALL' ? 1 : 0) +
     (selectedDomainFilterExec !== 'ALL' ? 1 : 0) +
     (selectedTaskFilterExec !== 'ALL' ? 1 : 0) +
-    (selectedCategoryFilterExec !== 'ALL' ? 1 : 0);
+    (selectedCategoryFilterExec !== 'ALL' ? 1 : 0) +
+    (selectedSubCategoryFilterExec !== 'ALL' ? 1 : 0);
 
   const resetAllFilters = () => {
     setSelectedFlagFilter('all');
@@ -381,6 +394,7 @@ export const ExecutionsView: React.FC = () => {
     setSelectedDomainFilterExec('ALL');
     setSelectedTaskFilterExec('ALL');
     setSelectedCategoryFilterExec('ALL');
+    setSelectedSubCategoryFilterExec('ALL');
     setSearchQuery('');
   };
 
@@ -637,6 +651,23 @@ export const ExecutionsView: React.FC = () => {
               {EXPENSE_CATEGORIES.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 세목 필터 */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-600">세목:</span>
+            <select
+              value={selectedSubCategoryFilterExec}
+              onChange={(e) => setSelectedSubCategoryFilterExec(e.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="ALL">전체 세목</option>
+              {availableSubCategories.map((sc) => (
+                <option key={sc} value={sc}>
+                  {sc}
                 </option>
               ))}
             </select>

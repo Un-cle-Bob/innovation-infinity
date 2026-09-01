@@ -50,6 +50,14 @@ const PRESET_DOMAINS: Record<string, DomainColorTheme> = {
     dot: 'bg-rose-500',
     lightBg: 'bg-rose-50/50',
   },
+  IZ: {
+    bg: 'bg-slate-100',
+    text: 'text-slate-700',
+    border: 'border-slate-300',
+    badge: 'bg-slate-100 text-slate-700 border border-slate-300',
+    dot: 'bg-slate-500',
+    lightBg: 'bg-slate-100/60',
+  },
   IF: {
     bg: 'bg-sky-50',
     text: 'text-sky-700',

@@ -33,6 +33,7 @@ import {
   Plus,
   Trash2,
   Target,
+  FileText,
 } from 'lucide-react';
 
 export const TasksView: React.FC = () => {
@@ -950,32 +951,63 @@ export const TasksView: React.FC = () => {
                                           이 항목에 연결된 세부프로그램이 아직 없습니다.
                                         </p>
                                       ) : (
-                                        linkedPrograms.map((p) => (
-                                          <div
-                                            key={p.id}
-                                            className="flex items-center justify-between gap-2 rounded bg-white border border-emerald-100 px-2 py-1 text-[11px]"
-                                          >
-                                            <div className="flex items-center gap-1.5 min-w-0">
-                                              <span
-                                                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold border ${getStatusColor(
-                                                  p.status
-                                                )}`}
-                                              >
-                                                {p.status}
-                                              </span>
-                                              <span className="font-semibold text-slate-800 truncate">
-                                                {p.name}
-                                                {p.round_label ? ` (${p.round_label})` : ''}
-                                              </span>
+                                        linkedPrograms.map((p) => {
+                                          const execAmount = executions
+                                            .filter(
+                                              (e) =>
+                                                p.internal_approval_doc_number &&
+                                                e.internal_approval_doc_number === p.internal_approval_doc_number
+                                            )
+                                            .reduce((sum, e) => sum + e.amount, 0);
+                                          return (
+                                            <div
+                                              key={p.id}
+                                              className="rounded bg-white border border-emerald-100 px-2 py-1.5 text-[11px] space-y-1"
+                                            >
+                                              <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-1.5 min-w-0">
+                                                  <span
+                                                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold border ${getStatusColor(
+                                                      p.status
+                                                    )}`}
+                                                  >
+                                                    {p.status}
+                                                  </span>
+                                                  <span className="font-semibold text-slate-800 truncate">
+                                                    {p.name}
+                                                    {p.round_label ? ` (${p.round_label})` : ''}
+                                                  </span>
+                                                </div>
+                                                <div className="shrink-0 text-slate-500">
+                                                  참여 {p.performance?.participants ?? 0}명
+                                                  {p.performance?.satisfaction_score
+                                                    ? ` · 만족도 ${p.performance.satisfaction_score.toFixed(1)}`
+                                                    : ''}
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                                                <span className="text-slate-500">
+                                                  실적별 집행액:{' '}
+                                                  <strong className="font-mono font-bold text-emerald-700">
+                                                    ₩{execAmount.toLocaleString()}
+                                                  </strong>
+                                                </span>
+                                                {p.result_report_doc_number ? (
+                                                  <span className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-mono font-bold text-emerald-800">
+                                                    <FileText className="h-3 w-3" />
+                                                    {p.result_report_doc_number}
+                                                  </span>
+                                                ) : p.status === '완료' ? (
+                                                  <span className="inline-flex items-center gap-1 rounded border border-rose-300 bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
+                                                    결과보고서 미제출
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-[10px] text-slate-300">결과보고서 -</span>
+                                                )}
+                                              </div>
                                             </div>
-                                            <div className="shrink-0 text-slate-500">
-                                              참여 {p.performance?.participants ?? 0}명
-                                              {p.performance?.satisfaction_score
-                                                ? ` · 만족도 ${p.performance.satisfaction_score.toFixed(1)}`
-                                                : ''}
-                                            </div>
-                                          </div>
-                                        ))
+                                          );
+                                        })
                                       )}
                                     </div>
                                   )}
@@ -1244,8 +1276,7 @@ export const TasksView: React.FC = () => {
                                         task.code,
                                         item.code,
                                         e.target.value as ItemStatus,
-                                        deptGroup.department,
-                                        '부서 뷰에서 상태 변경'
+                                        `부서 뷰에서 상태 변경 (${deptGroup.department})`
                                       )
                                     }
                                     className={`rounded px-2 py-0.5 text-xs font-bold border disabled:opacity-50 disabled:cursor-not-allowed ${getStatusColor(

@@ -75,8 +75,8 @@ export const TAB_PERMISSION_OPTIONS: { id: AppTabId; label: string }[] = [
   { id: 'programs', label: '실적 관리' },
   { id: 'kpi', label: '성과지표 (KPI)' },
   { id: 'reports', label: '보고서 인쇄/PDF' },
-  { id: 'approvals', label: '승인 요청함' },
-  { id: 'settings', label: '기준정보 & 부서' },
+  { id: 'approvals', label: '수정 요청함' },
+  // 'settings'(시스템 설정)는 주관리자 전용이라 위임 가능한 권한 목록에서 제외
 ];
 
 export const DEFAULT_USERS: User[] = [

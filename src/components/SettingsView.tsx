@@ -27,14 +27,12 @@ export const SettingsView: React.FC = () => {
     deleteCorporateCard,
     currentUser,
     updateUserTabPermission,
-    canEditTab,
-    canDeleteTab,
   } = useApp();
 
-  const canEdit = canEditTab('settings');
-  const canDelete = canDeleteTab('settings');
-  // 사용자 권한(수정/삭제 체크박스) 편집은 주관리자만 가능
+  // 시스템 설정(담당부서/법인카드/사용자 권한) 편집은 전부 주관리자만 가능
   const isSuperAdmin = currentUser.role === 'super_admin';
+  const canEdit = isSuperAdmin;
+  const canDelete = isSuperAdmin;
 
   const [newDeptName, setNewDeptName] = useState('');
   const [newCardLabel, setNewCardLabel] = useState('');
@@ -108,6 +106,12 @@ export const SettingsView: React.FC = () => {
                 <p className="text-xs text-slate-500">집행내역 및 세부프로그램에서 선택되는 공식 부서 목록</p>
               </div>
             </div>
+            {!isSuperAdmin && (
+              <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500 flex items-center gap-1 shrink-0">
+                <ShieldCheck className="h-3 w-3" />
+                주관리자만 편집 가능
+              </span>
+            )}
           </div>
 
           {/* Add Dept Form */}
@@ -207,6 +211,12 @@ export const SettingsView: React.FC = () => {
                 <p className="text-xs text-slate-500">집행내역에서 선택 가능한 법인카드 고정 목록</p>
               </div>
             </div>
+            {!isSuperAdmin && (
+              <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-500 flex items-center gap-1 shrink-0">
+                <ShieldCheck className="h-3 w-3" />
+                주관리자만 편집 가능
+              </span>
+            )}
           </div>
 
           {/* Add Card Form */}

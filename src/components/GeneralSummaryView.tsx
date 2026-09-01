@@ -728,6 +728,24 @@ export const GeneralSummaryView: React.FC = () => {
           >
             ₩{grandTotal.overallExecuted.toLocaleString()}
           </div>
+          <div className="mt-1.5 grid grid-cols-3 gap-1 border-t border-slate-100 pt-1.5">
+            {(['이월금', '기본사업비', '적정규모화'] as const).map((src) => {
+              const fundColor = getFundColorTheme(src);
+              return (
+                <div key={src} className="text-center min-w-0">
+                  <span className={`inline-block rounded px-1 py-0.5 text-[9px] font-bold ${fundColor.badge}`}>
+                    {src}
+                  </span>
+                  <div
+                    className="text-[10px] font-bold text-slate-700 font-mono mt-0.5 truncate"
+                    title={`₩${grandTotalsBySource[src].overallExecuted.toLocaleString()}`}
+                  >
+                    ₩{grandTotalsBySource[src].overallExecuted.toLocaleString()}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-2xs min-w-0 text-center">
@@ -737,6 +755,24 @@ export const GeneralSummaryView: React.FC = () => {
             title={`₩${grandTotal.overallRemaining.toLocaleString()}`}
           >
             ₩{grandTotal.overallRemaining.toLocaleString()}
+          </div>
+          <div className="mt-1.5 grid grid-cols-3 gap-1 border-t border-slate-100 pt-1.5">
+            {(['이월금', '기본사업비', '적정규모화'] as const).map((src) => {
+              const fundColor = getFundColorTheme(src);
+              return (
+                <div key={src} className="text-center min-w-0">
+                  <span className={`inline-block rounded px-1 py-0.5 text-[9px] font-bold ${fundColor.badge}`}>
+                    {src}
+                  </span>
+                  <div
+                    className="text-[10px] font-bold text-slate-700 font-mono mt-0.5 truncate"
+                    title={`₩${grandTotalsBySource[src].overallRemaining.toLocaleString()}`}
+                  >
+                    ₩{grandTotalsBySource[src].overallRemaining.toLocaleString()}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
