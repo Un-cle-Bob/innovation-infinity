@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+/* ============================================================
+   인쇄(Print) 전용 스타일
+   - .app-no-print : 인쇄 시 완전히 숨김 (헤더/네비게이션/버튼 등)
+   - .app-print-area : 인쇄 시 폭 제한/스크롤 제거하고 전체 내용 노출
+   ============================================================ */
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 8mm;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  .app-no-print {
+    display: none !important;
+  }
+
+  .app-print-area {
+    max-width: none !important;
+    width: 100% !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* 가로 스크롤 컨테이너 안의 내용이 잘리지 않도록 강제로 전체 노출 */
+  .app-print-area,
+  .app-print-area * {
+    overflow: visible !important;
+  }
+
+  /* sticky 컬럼은 인쇄 시 위치가 깨지므로 일반 배치로 전환 */
+  .app-print-area [class*="sticky"] {
+    position: static !important;
+    left: auto !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+}
+

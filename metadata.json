@@ -1,0 +1,8 @@
+{
+  "name": "대학혁신지원사업단 통합관리 시스템",
+  "description": "대학혁신지원사업단 다년도 예산·집행·프로그램 성과 및 성과지표(KPI) 통합관리 웹애플리케이션",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
