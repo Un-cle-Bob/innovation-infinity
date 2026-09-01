@@ -30,11 +30,11 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab 
     { id: 'reports', label: '보고서 인쇄/PDF', icon: Printer },
     {
       id: 'approvals',
-      label: '승인 요청함',
+      label: '수정 요청함',
       icon: FileCheck2,
       badge: pendingApprovalCount > 0 ? pendingApprovalCount : null,
     },
-    { id: 'settings', label: '기준정보 & 부서', icon: Settings },
+    { id: 'settings', label: '시스템 설정', icon: Settings },
   ];
 
   return (

@@ -46,8 +46,9 @@ interface AppContextType {
   users: User[];
   setCurrentUserRole: (role: UserRole) => void;
   switchUser: (uid: string) => void;
-  updateUserTabPermissions: (uid: string, tabPermissions: AppTabId[]) => void;
+  updateUserTabPermission: (uid: string, tabId: AppTabId, kind: 'edit' | 'delete', value: boolean) => void;
   canEditTab: (tabId: AppTabId) => boolean;
+  canDeleteTab: (tabId: AppTabId) => boolean;
 
   yearData: YearData;
   tasks: { [code: string]: Task };
@@ -130,8 +131,10 @@ interface AppContextType {
 
   // Settings Actions (9절)
   addDepartment: (name: string) => void;
+  updateDepartment: (id: string, name: string) => void;
   deleteDepartment: (id: string) => void;
   addCorporateCard: (label: string, last4: string) => void;
+  updateCorporateCard: (id: string, label: string, last4: string) => void;
   deleteCorporateCard: (id: string) => void;
 
   toasts: ToastMessage[];
@@ -223,32 +226,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   /**
-   * 사용자별 탭(메뉴) 수정 권한 설정. 주관리자는 대상에서 제외(항상 전체 허용).
+   * 사용자별 탭(메뉴) 수정/삭제 권한 개별 설정 (체크박스 하나 토글할 때마다 호출)
    */
-  const updateUserTabPermissions = (uid: string, tabPermissions: AppTabId[]) => {
+  const updateUserTabPermission = (
+    uid: string,
+    tabId: AppTabId,
+    kind: 'edit' | 'delete',
+    value: boolean
+  ) => {
     setUsers((prev) => {
-      const next = prev.map((u) => (u.uid === uid ? { ...u, tab_permissions: tabPermissions } : u));
+      const next = prev.map((u) => {
+        if (u.uid !== uid) return u;
+        const currentTabPerms = u.tab_permissions || {};
+        const currentForTab = currentTabPerms[tabId] || {};
+        return {
+          ...u,
+          tab_permissions: {
+            ...currentTabPerms,
+            [tabId]: { ...currentForTab, [kind]: value },
+          },
+        };
+      });
       saveUsers(next);
       return next;
     });
-    // 지금 로그인 중인 계정의 권한이 바뀐 경우 currentUser도 동기화
-    setCurrentUser((prev) => (prev.uid === uid ? { ...prev, tab_permissions: tabPermissions } : prev));
+    setCurrentUser((prev) => {
+      if (prev.uid !== uid) return prev;
+      const currentTabPerms = prev.tab_permissions || {};
+      const currentForTab = currentTabPerms[tabId] || {};
+      return {
+        ...prev,
+        tab_permissions: {
+          ...currentTabPerms,
+          [tabId]: { ...currentForTab, [kind]: value },
+        },
+      };
+    });
     showToast('사용자 권한이 업데이트되었습니다.', 'success');
   };
 
   /**
-   * 현재 로그인한 사용자가 특정 탭을 수정할 수 있는지 여부.
+   * 현재 로그인한 사용자가 특정 탭을 수정(등록/편집)할 수 있는지 여부.
    * - 주관리자: 항상 true
-   * - tab_permissions가 설정된 사용자: 그 목록에 포함된 탭만 true
+   * - tab_permissions가 설정된 사용자: 그 탭의 edit 값
    * - tab_permissions 미설정(하위호환): 부관리자는 전체 허용, 보조관리자는 집행관리만 허용
    */
   const canEditTab = (tabId: AppTabId): boolean => {
     if (currentUser.role === 'super_admin') return true;
     if (currentUser.tab_permissions) {
-      return currentUser.tab_permissions.includes(tabId);
+      return !!currentUser.tab_permissions[tabId]?.edit;
     }
     if (currentUser.role === 'sub_admin') return true;
     return tabId === 'executions';
+  };
+
+  /**
+   * 현재 로그인한 사용자가 특정 탭에서 삭제를 시도할 수 있는지 여부.
+   * - 주관리자: 항상 true
+   * - 보조관리자: 삭제는 항상 승인요청으로만 처리되므로, 그 탭에 edit 권한(=접근 권한)이 있으면 요청 가능
+   * - 부관리자: tab_permissions가 설정되어 있으면 그 탭의 delete 값을 그대로 따름 (미설정 시 하위호환으로 전체 허용)
+   */
+  const canDeleteTab = (tabId: AppTabId): boolean => {
+    if (currentUser.role === 'super_admin') return true;
+    if (currentUser.role === 'assistant_admin') return canEditTab(tabId);
+    if (currentUser.tab_permissions) {
+      return !!currentUser.tab_permissions[tabId]?.delete;
+    }
+    return true;
   };
 
   // Task & Item Mutations
@@ -482,7 +526,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         approval_requests: { ...prev.approval_requests, [reqId]: req },
       }));
 
-      showToast('보조관리자 권한: 집행내역 수정 승인요청이 생성되었습니다.', 'info');
+      showToast('보조관리자 권한: 집행내역 수정 요청이 생성되었습니다.', 'info');
       return { success: true, isPendingApproval: true };
     }
 
@@ -554,7 +598,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         approval_requests: { ...prev.approval_requests, [reqId]: req },
       }));
 
-      showToast('보조관리자 권한: 집행내역 삭제 승인요청이 생성되었습니다.', 'info');
+      showToast('보조관리자 권한: 집행내역 삭제 요청이 생성되었습니다.', 'info');
       return { success: true, isPendingApproval: true };
     }
 
@@ -827,6 +871,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`담당부서 [${name}]이(가) 추가되었습니다.`, 'success');
   };
 
+  const updateDepartment = (id: string, name: string) => {
+    const updated = departments.map((d) => (d.id === id ? { ...d, name } : d));
+    setDepartments(updated);
+    saveDepartments(updated);
+    showToast(`담당부서가 [${name}](으)로 수정되었습니다.`, 'success');
+  };
+
   const deleteDepartment = (id: string) => {
     const updated = departments.filter((d) => d.id !== id);
     setDepartments(updated);
@@ -841,6 +892,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCorporateCards(updated);
     saveCorporateCards(updated);
     showToast(`법인카드 [${label}(${last4})]가 추가되었습니다.`, 'success');
+  };
+
+  const updateCorporateCard = (id: string, label: string, last4: string) => {
+    const updated = corporateCards.map((c) => (c.id === id ? { ...c, label, last4 } : c));
+    setCorporateCards(updated);
+    saveCorporateCards(updated);
+    showToast(`법인카드가 [${label}(${last4})]로 수정되었습니다.`, 'success');
   };
 
   const deleteCorporateCard = (id: string) => {
@@ -866,8 +924,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         users,
         setCurrentUserRole,
         switchUser,
-        updateUserTabPermissions,
+        updateUserTabPermission,
         canEditTab,
+        canDeleteTab,
         yearData,
         tasks: yearData.tasks,
         executions: executionsList,
@@ -895,8 +954,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         applyKpiRecommendation,
         updateKpiSubMeasureRecommendedValue,
         addDepartment,
+        updateDepartment,
         deleteDepartment,
         addCorporateCard,
+        updateCorporateCard,
         deleteCorporateCard,
         toasts,
         showToast,

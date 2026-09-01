@@ -27,6 +27,12 @@ export type ItemStatus = '예정' | '진행중' | '완료' | '보류';
 
 export type SignalFlag = 'green' | 'orange' | 'red';
 
+/** 탭(메뉴)별 수정/삭제 권한 세부 항목 */
+export interface TabPermission {
+  edit?: boolean;
+  delete?: boolean;
+}
+
 export interface User {
   uid: string;
   name: string;
@@ -34,11 +40,12 @@ export interface User {
   department: string;
   role: UserRole;
   /**
-   * 탭(메뉴)별 수정 권한. 주관리자(super_admin)는 이 값과 무관하게 항상 모든 탭을 수정할 수 있다.
-   * 부관리자/보조관리자는 여기 포함된 탭만 수정 가능(다른 탭은 조회만 가능).
-   * 미설정(undefined)이면 하위호환을 위해 기존 role 기준 동작(부관리자=전체 허용, 보조관리자=집행관리만)으로 취급.
+   * 탭(메뉴)별 수정/삭제 권한. 주관리자(super_admin)는 이 값과 무관하게 항상 모든 탭을 수정·삭제할 수 있다.
+   * 부관리자는 여기 명시된 탭의 edit/delete 값만 각각 적용된다.
+   * 보조관리자는 삭제는 항상 승인요청으로만 가능(edit 권한이 있으면 요청 가능)하고, edit 권한이 있으면 등록/수정 요청이 가능하다.
+   * 미설정(undefined)이면 하위호환을 위해 기존 role 기준 동작으로 취급.
    */
-  tab_permissions?: AppTabId[];
+  tab_permissions?: Partial<Record<AppTabId, TabPermission>>;
 }
 
 export interface Department {

@@ -273,6 +273,40 @@ export const ReportsView: React.FC = () => {
     });
   }, [filteredTasks, filteredExecutions]);
 
+  // 영역별(IA~IZ) 예산/집행 현황 통계
+  const domainStats = useMemo(() => {
+    const domainMeta = [
+      { code: 'IA', name: '교육혁신(IA)' },
+      { code: 'IB', name: '고등직업교육혁신(IB)' },
+      { code: 'IC', name: '산학혁신(IC)' },
+      { code: 'ID', name: '지역협력혁신(ID)' },
+      { code: 'IE', name: '자율혁신(IE)' },
+      { code: 'IZ', name: '사업관리(IZ)' },
+    ];
+    return domainMeta
+      .map((d) => {
+        const domainTasks = filteredTasks.filter((t) => t.code.startsWith(d.code));
+        let budget = 0;
+        domainTasks.forEach((t) => {
+          budget += t.budget_total || 0;
+        });
+        const taskCodeSet = new Set(domainTasks.map((t) => t.code));
+        const executed = filteredExecutions
+          .filter((e) => taskCodeSet.has(e.task_code))
+          .reduce((sum, e) => sum + e.amount, 0);
+        return {
+          domainCode: d.code,
+          domainName: d.name,
+          taskCount: domainTasks.length,
+          budget,
+          executed,
+          remaining: budget - executed,
+          rate: budget > 0 ? (executed / budget) * 100 : 0,
+        };
+      })
+      .filter((d) => d.taskCount > 0);
+  }, [filteredTasks, filteredExecutions]);
+
   // 월별 실적(프로그램) 참여자 및 누적 통계 (3월 ~ 익년 2월)
   const monthlyProgramStats = useMemo(() => {
     let cumulativeParticipants = 0;
@@ -535,13 +569,13 @@ export const ReportsView: React.FC = () => {
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                1. 총괄 사업비 예산 및 {periodLabelText} 집행 현황
+                1. 총괄 사업비 예산 및 집행 현황
               </h3>
               <table className="w-full text-xs text-left border-collapse border border-slate-300">
                 <thead className="bg-slate-100 font-bold text-slate-800 text-center">
                   <tr>
                     <th className="border border-slate-300 p-2">총 편성 예산 (A)</th>
-                    <th className="border border-slate-300 p-2">{periodLabelText} 집행액 (B)</th>
+                    <th className="border border-slate-300 p-2">집행액 (B)</th>
                     <th className="border border-slate-300 p-2">집행 잔액 (A - B)</th>
                     <th className="border border-slate-300 p-2">집행률 (B / A)</th>
                     <th className="border border-slate-300 p-2">대상 과제수</th>
@@ -654,18 +688,58 @@ export const ReportsView: React.FC = () => {
               </table>
             </div>
 
-            {/* 3) 7 Expense Categories Breakdown (배정예산 오류 완전 수정) */}
+            {/* 3) 영역별 집행 현황 (신규) */}
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                3. 비목별 예산 및 {periodLabelText} 집행 현황 (7개 비목)
+                3. 영역별 예산 및 집행 현황
+              </h3>
+              <table className="w-full text-xs text-left border-collapse border border-slate-300">
+                <thead className="bg-slate-100 font-bold text-slate-800 text-center">
+                  <tr>
+                    <th className="border border-slate-300 p-2">영역</th>
+                    <th className="border border-slate-300 p-2">세부과제 수</th>
+                    <th className="border border-slate-300 p-2 text-right">편성예산 (₩)</th>
+                    <th className="border border-slate-300 p-2 text-right">집행액 (₩)</th>
+                    <th className="border border-slate-300 p-2 text-right">잔액 (₩)</th>
+                    <th className="border border-slate-300 p-2">집행률</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {domainStats.map((d) => (
+                    <tr key={d.domainCode}>
+                      <td className="border border-slate-300 p-2 font-bold text-slate-900">{d.domainName}</td>
+                      <td className="border border-slate-300 p-2 text-center">{d.taskCount}개</td>
+                      <td className="border border-slate-300 p-2 text-right font-mono">
+                        ₩{d.budget.toLocaleString()}
+                      </td>
+                      <td className="border border-slate-300 p-2 text-right font-mono text-emerald-800 font-bold">
+                        ₩{d.executed.toLocaleString()}
+                      </td>
+                      <td className="border border-slate-300 p-2 text-right font-mono text-blue-800">
+                        ₩{d.remaining.toLocaleString()}
+                      </td>
+                      <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900">
+                        {d.rate.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 4) 7 Expense Categories Breakdown (배정예산 오류 완전 수정) */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
+                <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
+                4. 비목별 예산 및 집행 현황 (7개 비목)
               </h3>
               <table className="w-full text-xs text-left border-collapse border border-slate-300">
                 <thead className="bg-slate-100 font-bold text-slate-800 text-center">
                   <tr>
                     <th className="border border-slate-300 p-1.5">비목명</th>
                     <th className="border border-slate-300 p-1.5 text-right">배정 예산 (₩)</th>
-                    <th className="border border-slate-300 p-1.5 text-right">{periodLabelText} 집행액 (₩)</th>
+                    <th className="border border-slate-300 p-1.5 text-right">집행액 (₩)</th>
                     <th className="border border-slate-300 p-1.5 text-right">집행 잔액 (₩)</th>
                     <th className="border border-slate-300 p-1.5 text-center w-24">집행률 (%)</th>
                   </tr>
@@ -711,7 +785,7 @@ export const ReportsView: React.FC = () => {
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                4. 세부과제별 7비목 × 3재원 예산 및 주요추진항목 현황
+                5. 세부과제별 7비목 × 3재원 예산 및 주요추진항목 현황
               </h3>
 
               <div className="space-y-6">
@@ -724,7 +798,7 @@ export const ReportsView: React.FC = () => {
                       key={task.code}
                       className="border border-slate-300 rounded-lg p-4 bg-slate-50/30 break-inside-avoid space-y-3"
                     >
-                      <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                      <div className="flex flex-col gap-2 border-b border-slate-200 pb-2 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-2">
                           <span className="rounded-md bg-slate-800 text-white font-mono px-2 py-0.5 text-xs font-bold">
                             {task.code}
@@ -732,10 +806,43 @@ export const ReportsView: React.FC = () => {
                           <span className="font-bold text-xs text-slate-900">{task.name}</span>
                           <span className="text-xs text-slate-500">[{task.domain}]</span>
                         </div>
-                        <div className="text-xs font-bold text-slate-800">
-                          총예산: ₩{summary.total_budget.toLocaleString()} | {periodLabelText} 집행: ₩
-                          {summary.total_executed.toLocaleString()} | 잔액: ₩
-                          {summary.total_remaining.toLocaleString()} ({summary.execution_rate.toFixed(1)}%)
+                        <div className="flex items-center gap-3 text-xs font-bold text-slate-800">
+                          <div className="w-28 text-right">
+                            <span className="block text-[9px] font-semibold text-slate-400">총예산</span>
+                            <span className="font-mono tabular-nums">₩{summary.total_budget.toLocaleString()}</span>
+                          </div>
+                          <div className="w-28 text-right">
+                            <span className="block text-[9px] font-semibold text-slate-400">집행</span>
+                            <span className="font-mono tabular-nums text-emerald-700">
+                              ₩{summary.total_executed.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="w-28 text-right">
+                            <span className="block text-[9px] font-semibold text-slate-400">잔액</span>
+                            <span className="font-mono tabular-nums text-blue-700">
+                              ₩{summary.total_remaining.toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="w-24">
+                            <span className="block text-[9px] font-semibold text-slate-400 text-right">집행률</span>
+                            <div className="flex items-center gap-1.5">
+                              <div className="h-1.5 flex-1 rounded-full bg-slate-200 overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${
+                                    summary.execution_rate >= 80
+                                      ? 'bg-emerald-500'
+                                      : summary.execution_rate >= 40
+                                      ? 'bg-amber-500'
+                                      : 'bg-rose-500'
+                                  }`}
+                                  style={{ width: `${Math.min(100, summary.execution_rate)}%` }}
+                                />
+                              </div>
+                              <span className="font-mono tabular-nums text-indigo-900 w-9 text-right">
+                                {summary.execution_rate.toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
@@ -810,7 +917,7 @@ export const ReportsView: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                  5. 대학혁신지원사업 지출부 ({periodLabelText} 지출 집행 상세 — {filteredExecutions.length}건)
+                  6. 대학혁신지원사업 지출부 (지출 집행 상세 — {filteredExecutions.length}건)
                 </h3>
                 <span className="text-xs text-slate-500 font-mono">
                   * 영역 코드, 주요추진항목 코드 및 맨 우측 영역별 관리연번 수록
@@ -903,11 +1010,84 @@ export const ReportsView: React.FC = () => {
         {/* ========================================================= */}
         {reportType === 'performance' && (
           <div className="space-y-8">
-            {/* 1) Overall Performance Summary */}
+            {/* 1) 5대 자율성과지표(KPI) 종합 달성 현황 — 성과지표/세부지표/세부측정지표까지 표시 */}
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                1. 세부프로그램 총괄 운영 및 성과 요약 ({periodLabelText})
+                1. 대학혁신 5대 자율성과지표(KPI) 종합 달성 현황
+              </h3>
+              <table className="w-full text-[11px] text-left border-collapse border border-slate-300">
+                <thead className="bg-slate-100 font-bold text-slate-800 text-center">
+                  <tr>
+                    <th className="border border-slate-300 p-2">자율성과지표 (KPI)</th>
+                    <th className="border border-slate-300 p-2 w-20">기준값</th>
+                    <th className="border border-slate-300 p-2 w-20">목표값</th>
+                    <th className="border border-slate-300 p-2 w-24">가중합 실적값</th>
+                    <th className="border border-slate-300 p-2 w-24">달성도 (%)</th>
+                    <th className="border border-slate-300 p-2 text-left min-w-[320px]">
+                      세부지표 → 측정지표 → 세부측정지표 실적 내역
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {kpis.map((kpi, idx) => {
+                    const achRate = (kpi.achievement * 100).toFixed(1);
+                    return (
+                      <tr key={kpi.id}>
+                        <td className="border border-slate-300 p-2 font-bold text-slate-900 align-top">
+                          {idx + 1}. {kpi.name}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-center align-top">{kpi.baseline}</td>
+                        <td className="border border-slate-300 p-2 text-center font-semibold align-top">
+                          {kpi.target}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900 align-top">
+                          {kpi.actual}
+                        </td>
+                        <td className="border border-slate-300 p-2 text-center font-extrabold text-emerald-800 align-top">
+                          {achRate}%
+                        </td>
+                        <td className="border border-slate-300 p-2 text-[10px] space-y-1.5 align-top">
+                          {kpi.details.map((d, dIdx) => (
+                            <div key={d.id}>
+                              <div className="font-bold text-slate-800">
+                                • {dIdx + 1}) {d.name} (가중치 {((kpi.weights?.[dIdx] || 0) * 100).toFixed(0)}%): 실적{' '}
+                                <strong>{d.actual}</strong> / 기준 {d.baseline}
+                              </div>
+                              {d.measures.map((m, mIdx) => (
+                                <div key={m.id} className="pl-3 text-slate-700">
+                                  <div>
+                                    - {dIdx + 1}.{mIdx + 1}) {m.name}: 실적 <strong>{m.actual}</strong> / 기준{' '}
+                                    {m.baseline}
+                                  </div>
+                                  {m.sub_measures.map((sm) => (
+                                    <div key={sm.id} className="pl-3 text-slate-500">
+                                      · {sm.name}: 실적{' '}
+                                      <strong className="text-indigo-800">
+                                        {sm.actual === null || sm.actual === undefined ? '-' : sm.actual}
+                                      </strong>
+                                      {sm.recommended_value != null && <> (권장 {sm.recommended_value})</>}
+                                      {sm.department && <> · {sm.department}</>}
+                                      {sm.check_result && <> · 점검 {sm.check_result}</>}
+                                    </div>
+                                  ))}
+                                </div>
+                              ))}
+                            </div>
+                          ))}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* 2) Overall Performance Summary */}
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
+                <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
+                2. 세부프로그램 총괄 운영 및 성과 요약
               </h3>
               <table className="w-full text-xs text-left border-collapse border border-slate-300">
                 <thead className="bg-slate-100 font-bold text-slate-800 text-center">
@@ -970,7 +1150,7 @@ export const ReportsView: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                  2. 월별 및 누적 프로그램 운영 및 참여 실적 (3월 ~ 익년 2월)
+                  3. 월별 및 누적 프로그램 운영 및 참여 실적 (3월 ~ 익년 2월)
                 </h3>
                 {hideEmptyMonths && (
                   <span className="text-[11px] text-indigo-700 font-semibold">
@@ -1019,7 +1199,7 @@ export const ReportsView: React.FC = () => {
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                3. 세부프로그램별 실적 및 성과 상세 내역 ({filteredPrograms.length}개)
+                4. 세부프로그램별 실적 및 성과 상세 내역 ({filteredPrograms.length}개)
               </h3>
               <table className="w-full text-[11px] text-left border-collapse border border-slate-300">
                 <thead className="bg-slate-100 font-bold text-slate-800 text-center">
@@ -1105,57 +1285,7 @@ export const ReportsView: React.FC = () => {
               </table>
             </div>
 
-            {/* 4) 5 Major Autonomous KPIs Summary */}
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
-                <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                4. 대학혁신 5대 자율성과지표(KPI) 종합 달성 현황
-              </h3>
-              <table className="w-full text-[11px] text-left border-collapse border border-slate-300">
-                <thead className="bg-slate-100 font-bold text-slate-800 text-center">
-                  <tr>
-                    <th className="border border-slate-300 p-2">자율성과지표 (KPI)</th>
-                    <th className="border border-slate-300 p-2 w-20">기준값</th>
-                    <th className="border border-slate-300 p-2 w-20">목표값</th>
-                    <th className="border border-slate-300 p-2 w-24">가중합 실적값</th>
-                    <th className="border border-slate-300 p-2 w-24">달성도 (%)</th>
-                    <th className="border border-slate-300 p-2 text-left min-w-[220px]">
-                      세부지표 구성 및 실적 내역
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {kpis.map((kpi, idx) => {
-                    const achRate = (kpi.achievement * 100).toFixed(1);
-                    return (
-                      <tr key={kpi.id}>
-                        <td className="border border-slate-300 p-2 font-bold text-slate-900">
-                          {idx + 1}. {kpi.name}
-                        </td>
-                        <td className="border border-slate-300 p-2 text-center">{kpi.baseline}</td>
-                        <td className="border border-slate-300 p-2 text-center font-semibold">
-                          {kpi.target}
-                        </td>
-                        <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900">
-                          {kpi.actual}
-                        </td>
-                        <td className="border border-slate-300 p-2 text-center font-extrabold text-emerald-800">
-                          {achRate}%
-                        </td>
-                        <td className="border border-slate-300 p-2 text-[10px] space-y-1">
-                          {kpi.details.map((d, dIdx) => (
-                            <div key={d.id}>
-                              • {dIdx + 1}) {d.name} (가중치 {kpi.weights?.[dIdx] || 0}%): 실적{' '}
-                              <strong>{d.actual}</strong> / 기준 {d.baseline}
-                            </div>
-                          ))}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            {/* 4) 5대 자율성과지표(KPI) 종합 달성 현황은 1번 섹션으로 이동됨 */}
           </div>
         )}
       </div>

@@ -86,7 +86,7 @@ export const DEFAULT_USERS: User[] = [
     email: 'super@university.ac.kr',
     department: '혁신사업단',
     role: 'super_admin',
-    // 주관리자는 tab_permissions와 무관하게 항상 전체 수정 가능
+    // 주관리자는 tab_permissions와 무관하게 항상 전체 수정/삭제 가능
   },
   {
     uid: 'user-sub-budget',
@@ -94,7 +94,12 @@ export const DEFAULT_USERS: User[] = [
     email: 'sub-budget@university.ac.kr',
     department: '혁신사업단',
     role: 'sub_admin',
-    tab_permissions: ['tasks', 'executions', 'summary', 'reports'],
+    tab_permissions: {
+      tasks: { edit: true, delete: true },
+      executions: { edit: true, delete: true },
+      summary: { edit: true, delete: true },
+      reports: { edit: true, delete: true },
+    },
   },
   {
     uid: 'user-sub-performance',
@@ -102,7 +107,12 @@ export const DEFAULT_USERS: User[] = [
     email: 'sub-performance@university.ac.kr',
     department: '혁신사업단',
     role: 'sub_admin',
-    tab_permissions: ['programs', 'kpi', 'reports', 'approvals'],
+    tab_permissions: {
+      programs: { edit: true, delete: true },
+      kpi: { edit: true, delete: true },
+      reports: { edit: true, delete: true },
+      approvals: { edit: true, delete: true },
+    },
   },
   {
     uid: 'user-assistant-1',
@@ -110,7 +120,9 @@ export const DEFAULT_USERS: User[] = [
     email: 'assistant1@university.ac.kr',
     department: '입학취업처',
     role: 'assistant_admin',
-    tab_permissions: ['executions'],
+    tab_permissions: {
+      executions: { edit: true },
+    },
   },
   {
     uid: 'user-assistant-2',
@@ -118,7 +130,9 @@ export const DEFAULT_USERS: User[] = [
     email: 'assistant2@university.ac.kr',
     department: '교무학생처',
     role: 'assistant_admin',
-    tab_permissions: ['executions'],
+    tab_permissions: {
+      executions: { edit: true },
+    },
   },
   {
     uid: 'user-assistant-3',
@@ -126,6 +140,9 @@ export const DEFAULT_USERS: User[] = [
     email: 'assistant3@university.ac.kr',
     department: '취창업지원센터',
     role: 'assistant_admin',
-    tab_permissions: ['executions', 'programs'],
+    tab_permissions: {
+      executions: { edit: true },
+      programs: { edit: true },
+    },
   },
 ];

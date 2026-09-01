@@ -3,6 +3,11 @@ import { useApp } from '../context/AppContext';
 import { ExpenseCategory, FundSource, ItemStatus, Task, TaskItem } from '../types';
 import { EXPENSE_CATEGORIES, FUND_SOURCES } from '../data/constants';
 import { getTaskBudgetSummary, getItemBudgetSummary } from '../services/budgetEngine';
+import {
+  downloadBudgetImportTemplate,
+  parseBudgetImportFile,
+  BudgetImportResult,
+} from '../services/budgetImport';
 import { getDomainCode, getDomainColorTheme } from '../utils/domainColors';
 import {
   FolderTree,
@@ -23,10 +28,31 @@ import {
   Clock,
   AlertCircle,
   LayoutGrid,
+  Upload,
+  Download,
 } from 'lucide-react';
 
 export const TasksView: React.FC = () => {
-  const { tasks, executions, departments, updateTaskMatrix, updateItemBudgetMatrix, updateItemStatus, updateItem, canEditTab } = useApp();
+  const {
+    currentYear,
+    tasks,
+    executions,
+    departments,
+    updateTaskMatrix,
+    updateItemBudgetMatrix,
+    updateItemStatus,
+    updateItem,
+    canEditTab,
+  } = useApp();
+
+  const canEditTasks = canEditTab('tasks');
+
+  // 엑셀 업로드(예산 일괄편집) 상태
+  const budgetImportFileRef = React.useRef<HTMLInputElement>(null);
+  const [budgetImportResult, setBudgetImportResult] = useState<BudgetImportResult | null>(null);
+  const [isBudgetImportModalOpen, setIsBudgetImportModalOpen] = useState(false);
+  const [isBudgetImporting, setIsBudgetImporting] = useState(false);
+
 
   const [viewMode, setViewMode] = useState<'tasks' | 'departments'>('tasks');
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL');
@@ -152,6 +178,40 @@ export const TasksView: React.FC = () => {
       .sort((a, b) => b.items.length - a.items.length);
   }, [tasks, allDepartmentList, selectedDomain, selectedDepartment, searchQuery]);
 
+  // 엑셀 업로드(예산 일괄편집) 핸들러
+  const handleDownloadBudgetTemplate = () => {
+    downloadBudgetImportTemplate(tasks, currentYear);
+  };
+
+  const handleBudgetImportButtonClick = () => {
+    budgetImportFileRef.current?.click();
+  };
+
+  const handleBudgetImportFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const result = await parseBudgetImportFile(file, tasks);
+      setBudgetImportResult(result);
+      setIsBudgetImportModalOpen(true);
+    } catch (err) {
+      alert('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 다시 확인해주세요.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleConfirmBudgetImport = () => {
+    if (!budgetImportResult) return;
+    setIsBudgetImporting(true);
+    budgetImportResult.updates.forEach((u) => {
+      updateTaskMatrix(u.taskCode, u.matrix, u.total);
+    });
+    setIsBudgetImporting(false);
+    setIsBudgetImportModalOpen(false);
+    setBudgetImportResult(null);
+  };
+
   const handleOpenMatrixModal = (task: Task) => {
     setEditingTask(task);
     setTempMatrix(JSON.parse(JSON.stringify(task.budget_matrix || {})));
@@ -241,29 +301,60 @@ export const TasksView: React.FC = () => {
         </div>
 
         {/* View Mode Switcher */}
-        <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-2xs">
-          <button
-            onClick={() => setViewMode('tasks')}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-all ${
-              viewMode === 'tasks'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <FolderTree className="h-3.5 w-3.5" />
-            <span>과제별 보기 ({filteredTasks.length})</span>
-          </button>
-          <button
-            onClick={() => setViewMode('departments')}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-all ${
-              viewMode === 'departments'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-indigo-600'
-            }`}
-          >
-            <Building className="h-3.5 w-3.5" />
-            <span>부서별 추진항목·예산 보기</span>
-          </button>
+        <div className="flex flex-col items-end gap-2">
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1 shadow-2xs">
+            <button
+              onClick={() => setViewMode('tasks')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-all ${
+                viewMode === 'tasks'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FolderTree className="h-3.5 w-3.5" />
+              <span>과제별 보기 ({filteredTasks.length})</span>
+            </button>
+            <button
+              onClick={() => setViewMode('departments')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold transition-all ${
+                viewMode === 'departments'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-indigo-600'
+              }`}
+            >
+              <Building className="h-3.5 w-3.5" />
+              <span>부서별 추진항목·예산 보기</span>
+            </button>
+          </div>
+
+          {/* 예산 엑셀 일괄편집 (IZ 영역 제외) */}
+          {canEditTasks && (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleDownloadBudgetTemplate}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                title="세부과제 예산(비목×재원) 일괄편집용 엑셀 양식 다운로드 (IZ 영역 제외)"
+              >
+                <Download className="h-3.5 w-3.5 text-slate-500" />
+                <span>예산 양식 다운로드</span>
+              </button>
+              <input
+                ref={budgetImportFileRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleBudgetImportFileSelected}
+              />
+              <button
+                onClick={handleBudgetImportButtonClick}
+                className="inline-flex items-center gap-1 rounded-lg border border-indigo-300 bg-indigo-50 px-2.5 py-1.5 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                title="엑셀로 여러 세부과제 예산을 한 번에 반영 (IZ 영역 제외)"
+              >
+                <Upload className="h-3.5 w-3.5 text-indigo-600" />
+                <span>예산 엑셀 업로드</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1031,6 +1122,99 @@ export const TasksView: React.FC = () => {
               >
                 <Check className="h-4 w-4" />
                 <span>항목 예산 저장</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* 4-C. 예산 엑셀 업로드 미리보기 모달 */}
+      {/* ========================================================= */}
+      {isBudgetImportModalOpen && budgetImportResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">예산 엑셀 업로드 미리보기</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  <span className="font-bold text-indigo-700">
+                    {budgetImportResult.updates.length}개 세부과제
+                  </span>{' '}
+                  예산이 갱신됩니다
+                  {budgetImportResult.skipped.length > 0 && (
+                    <>
+                      {' '}
+                      · <span className="font-semibold text-amber-700">IZ 영역 {budgetImportResult.skipped.length}건 제외</span>
+                    </>
+                  )}
+                  {budgetImportResult.rowErrors.length > 0 && (
+                    <>
+                      {' '}
+                      · <span className="font-semibold text-rose-600">오류 {budgetImportResult.rowErrors.length}행 (해당 행 제외)</span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsBudgetImportModalOpen(false);
+                  setBudgetImportResult(null);
+                }}
+                className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-1.5">
+              {budgetImportResult.updates.map((u) => (
+                <div
+                  key={u.taskCode}
+                  className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 text-xs"
+                >
+                  <span className="font-mono font-bold text-slate-800">{u.taskCode}</span>
+                  <span className="text-slate-600 truncate max-w-[240px]">{u.taskName}</span>
+                  <span className="font-mono font-bold text-emerald-800">₩{u.total.toLocaleString()}</span>
+                </div>
+              ))}
+              {budgetImportResult.skipped.map((s) => (
+                <div
+                  key={s.taskCode}
+                  className="rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-800"
+                >
+                  <span className="font-mono font-bold">{s.taskCode}</span> — {s.reason}
+                </div>
+              ))}
+              {budgetImportResult.rowErrors.map((e, i) => (
+                <div
+                  key={i}
+                  className="rounded-lg border border-rose-200 bg-rose-50/50 px-3 py-2 text-xs text-rose-700"
+                >
+                  {e.rowIndex}행 — {e.message}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBudgetImportModalOpen(false);
+                  setBudgetImportResult(null);
+                }}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={isBudgetImporting || budgetImportResult.updates.length === 0}
+                onClick={handleConfirmBudgetImport}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload className="h-4 w-4" />
+                <span>{isBudgetImporting ? '반영 중...' : `${budgetImportResult.updates.length}개 세부과제 일괄반영`}</span>
               </button>
             </div>
           </div>

@@ -67,9 +67,11 @@ export const ProgramsView: React.FC = () => {
     deleteProgram,
     currentUser,
     canEditTab,
+    canDeleteTab,
   } = useApp();
 
   const canEdit = canEditTab('programs');
+  const canDelete = canDeleteTab('programs');
 
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
@@ -1335,24 +1337,25 @@ export const ProgramsView: React.FC = () => {
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-1.5">
-                            {canEdit ? (
-                              <>
-                                <button
-                                  onClick={() => startInlineEdit(prog)}
-                                  className="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-slate-100 transition-colors"
-                                  title="인라인 수정"
-                                >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => setDeleteTarget(prog)}
-                                  className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors"
-                                  title="프로그램 삭제"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </>
-                            ) : (
+                            {canEdit && (
+                              <button
+                                onClick={() => startInlineEdit(prog)}
+                                className="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-slate-100 transition-colors"
+                                title="인라인 수정"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={() => setDeleteTarget(prog)}
+                                className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors"
+                                title="프로그램 삭제"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {!canEdit && !canDelete && (
                               <span className="text-[10px] text-slate-300">조회전용</span>
                             )}
                           </div>

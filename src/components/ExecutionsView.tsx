@@ -4,11 +4,18 @@ import { Execution, ExpenseCategory, SignalFlag, Task, TaskItem } from '../types
 import { EXPENSE_CATEGORIES, SUB_CATEGORY_OPTIONS } from '../data/constants';
 import { calculateFundAllocation } from '../services/budgetEngine';
 import { exportExecutionsToExcel } from '../services/excelExport';
+import {
+  downloadExecutionImportTemplate,
+  parseExecutionImportFile,
+  ParsedExecutionRow,
+} from '../services/executionImport';
 import { getDomainCode, getDomainColorTheme, getExecutionManageNoMap } from '../utils/domainColors';
 import {
   ReceiptText,
   Plus,
   FileSpreadsheet,
+  Upload,
+  Download,
   Search,
   Filter,
   Trash2,
@@ -52,9 +59,17 @@ export const ExecutionsView: React.FC = () => {
     updateExecution,
     deleteExecution,
     canEditTab,
+    canDeleteTab,
   } = useApp();
 
   const canEdit = canEditTab('executions');
+  const canDelete = canDeleteTab('executions');
+
+  // 엑셀 업로드(일괄등록) 상태
+  const importFileInputRef = React.useRef<HTMLInputElement>(null);
+  const [importResults, setImportResults] = useState<ParsedExecutionRow[] | null>(null);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   // Search & Global quick filter
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -201,6 +216,51 @@ export const ExecutionsView: React.FC = () => {
       setSortKey(key);
       setSortDirection(key === 'amount' || key === 'date' ? 'desc' : 'asc');
     }
+  };
+
+  // 엑셀 업로드(일괄등록) 핸들러
+  const handleDownloadTemplate = () => {
+    downloadExecutionImportTemplate(tasks, departments, corporateCards, currentYear);
+  };
+
+  const handleImportButtonClick = () => {
+    importFileInputRef.current?.click();
+  };
+
+  const handleImportFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const results = await parseExecutionImportFile(file, tasks, departments, corporateCards);
+      setImportResults(results);
+      setIsImportModalOpen(true);
+    } catch (err) {
+      alert('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 다시 확인해주세요.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (!importResults) return;
+    const validRows = importResults.filter((r) => r.errors.length === 0 && r.data);
+    if (validRows.length === 0) return;
+
+    setIsImporting(true);
+    let successCount = 0;
+    let failCount = 0;
+    for (const row of validRows) {
+      if (!row.data) continue;
+      const res = addExecution(row.data);
+      if (res.success) successCount += 1;
+      else failCount += 1;
+    }
+    setIsImporting(false);
+    setIsImportModalOpen(false);
+    setImportResults(null);
+    alert(
+      `일괄등록이 끝났습니다.\n성공: ${successCount}건${failCount > 0 ? `\n실패(예산 초과 등): ${failCount}건` : ''}`
+    );
   };
 
   const handleOpenAddModal = () => {
@@ -363,6 +423,35 @@ export const ExecutionsView: React.FC = () => {
             <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
             <span>지출부 엑셀 다운로드 ({processedExecutions.length}건)</span>
           </button>
+
+          {/* Excel Bulk Import */}
+          {canEdit && (
+            <>
+              <button
+                onClick={handleDownloadTemplate}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+                title="집행내역 일괄등록용 표준 엑셀 양식 다운로드"
+              >
+                <Download className="h-4 w-4 text-slate-500" />
+                <span>업로드 양식 다운로드</span>
+              </button>
+              <input
+                ref={importFileInputRef}
+                type="file"
+                accept=".xlsx,.xls"
+                className="hidden"
+                onChange={handleImportFileSelected}
+              />
+              <button
+                onClick={handleImportButtonClick}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-300 bg-indigo-50 px-3.5 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors shadow-2xs"
+                title="엑셀 파일을 올려서 집행내역 여러 건을 한 번에 등록"
+              >
+                <Upload className="h-4 w-4 text-indigo-600" />
+                <span>엑셀 업로드</span>
+              </button>
+            </>
+          )}
 
           {/* New Execution Button */}
           {canEdit && (
@@ -1190,24 +1279,25 @@ export const ExecutionsView: React.FC = () => {
                           </div>
                         ) : (
                           <div className="flex items-center justify-center gap-1.5">
-                            {canEdit ? (
-                              <>
-                                <button
-                                  onClick={() => startInlineEdit(exec)}
-                                  className="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-slate-100 transition-colors"
-                                  title="인라인 수정"
-                                >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => setDeleteTarget(exec)}
-                                  className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors"
-                                  title="집행내역 삭제"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </>
-                            ) : (
+                            {canEdit && (
+                              <button
+                                onClick={() => startInlineEdit(exec)}
+                                className="text-slate-400 hover:text-indigo-600 p-1 rounded hover:bg-slate-100 transition-colors"
+                                title="인라인 수정"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={() => setDeleteTarget(exec)}
+                                className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors"
+                                title="집행내역 삭제"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                            {!canEdit && !canDelete && (
                               <span className="text-[10px] text-slate-300">조회전용</span>
                             )}
                           </div>
@@ -1251,7 +1341,7 @@ export const ExecutionsView: React.FC = () => {
                 <h3 className="text-base font-bold text-slate-900">집행내역 삭제 확인</h3>
                 <p className="text-xs text-slate-500">
                   {currentUser.role === 'assistant_admin'
-                    ? '보조관리자 권한: 삭제 승인요청이 생성됩니다.'
+                    ? '보조관리자 권한: 삭제 요청이 생성됩니다.'
                     : '해당 집행내역을 삭제하시겠습니까?'}
                 </p>
               </div>
@@ -1301,7 +1391,98 @@ export const ExecutionsView: React.FC = () => {
                 onClick={handleConfirmDelete}
                 className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 transition-colors shadow-xs"
               >
-                {currentUser.role === 'assistant_admin' ? '삭제 승인요청 생성' : '삭제 확인'}
+                {currentUser.role === 'assistant_admin' ? '삭제 요청 생성' : '삭제 확인'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Excel Bulk Import Preview Modal */}
+      {isImportModalOpen && importResults && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="w-full max-w-3xl rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-3">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">엑셀 업로드 미리보기</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  전체 {importResults.length}건 중{' '}
+                  <span className="font-bold text-emerald-700">
+                    등록 가능 {importResults.filter((r) => r.errors.length === 0).length}건
+                  </span>
+                  {importResults.some((r) => r.errors.length > 0) && (
+                    <>
+                      {' '}
+                      /{' '}
+                      <span className="font-bold text-rose-600">
+                        오류 {importResults.filter((r) => r.errors.length > 0).length}건 (제외됨)
+                      </span>
+                    </>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportResults(null);
+                }}
+                className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2">
+              {importResults.map((row) => (
+                <div
+                  key={row.rowIndex}
+                  className={`rounded-lg border p-2.5 text-xs ${
+                    row.errors.length > 0
+                      ? 'border-rose-200 bg-rose-50/60'
+                      : 'border-emerald-200 bg-emerald-50/40'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-slate-700">{row.rowIndex}행</span>
+                    {row.errors.length === 0 && row.data ? (
+                      <span className="text-slate-800">
+                        {row.data.date} · {row.data.task_code} · {row.data.content} ·{' '}
+                        <span className="font-mono font-bold">₩{row.data.amount.toLocaleString()}</span>
+                      </span>
+                    ) : (
+                      <span className="text-rose-700 font-semibold">등록 제외</span>
+                    )}
+                  </div>
+                  {row.errors.length > 0 && (
+                    <ul className="mt-1 list-disc list-inside text-rose-600">
+                      {row.errors.map((err, i) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsImportModalOpen(false);
+                  setImportResults(null);
+                }}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={isImporting || importResults.every((r) => r.errors.length > 0)}
+                onClick={handleConfirmImport}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 shadow-xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload className="h-4 w-4" />
+                <span>{isImporting ? '등록 중...' : `등록 가능한 ${importResults.filter((r) => r.errors.length === 0).length}건 일괄등록`}</span>
               </button>
             </div>
           </div>

@@ -52,7 +52,7 @@ export const ApprovalsView: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-slate-900">승인 요청함 (결재 대기 목록)</h2>
+            <h2 className="text-xl font-bold text-slate-900">수정 요청함 (결재 대기 목록)</h2>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
             보조관리자가 요청한 집행내역 수정 및 삭제 건에 대해 주관리자 및 부관리자가 검토 후 승인/반려합니다.
@@ -108,7 +108,7 @@ export const ApprovalsView: React.FC = () => {
       <div className="space-y-4">
         {filteredRequests.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white p-12 text-center text-xs text-slate-400">
-            조회할 승인 요청 건이 없습니다.
+            조회할 수정 요청 건이 없습니다.
           </div>
         ) : (
           filteredRequests.map((req) => {
@@ -307,7 +307,7 @@ export const ApprovalsView: React.FC = () => {
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center gap-2 border-b border-slate-100 pb-3 text-rose-700 font-bold">
               <XCircle className="h-5 w-5" />
-              <h3 className="text-base text-slate-900">승인 요청 반려</h3>
+              <h3 className="text-base text-slate-900">수정 요청 반려</h3>
             </div>
 
             <div className="mt-4 space-y-3">

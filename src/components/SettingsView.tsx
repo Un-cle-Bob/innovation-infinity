@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { TAB_PERMISSION_OPTIONS } from '../data/constants';
-import { AppTabId } from '../types';
 import {
   Settings,
   Building,
@@ -9,9 +8,10 @@ import {
   Users,
   Plus,
   Trash2,
+  Edit2,
   Check,
+  X,
   ShieldCheck,
-  Building2,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -20,19 +20,32 @@ export const SettingsView: React.FC = () => {
     corporateCards,
     users,
     addDepartment,
+    updateDepartment,
     deleteDepartment,
     addCorporateCard,
+    updateCorporateCard,
     deleteCorporateCard,
     currentUser,
-    updateUserTabPermissions,
+    updateUserTabPermission,
     canEditTab,
+    canDeleteTab,
   } = useApp();
 
   const canEdit = canEditTab('settings');
+  const canDelete = canDeleteTab('settings');
+  // 사용자 권한(수정/삭제 체크박스) 편집은 주관리자만 가능
+  const isSuperAdmin = currentUser.role === 'super_admin';
 
   const [newDeptName, setNewDeptName] = useState('');
   const [newCardLabel, setNewCardLabel] = useState('');
   const [newCardLast4, setNewCardLast4] = useState('');
+
+  const [editingDeptId, setEditingDeptId] = useState<string | null>(null);
+  const [editDeptName, setEditDeptName] = useState('');
+
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editCardLabel, setEditCardLabel] = useState('');
+  const [editCardLast4, setEditCardLast4] = useState('');
 
   const handleAddDept = (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,13 +62,34 @@ export const SettingsView: React.FC = () => {
     setNewCardLast4('');
   };
 
+  const startEditDept = (id: string, name: string) => {
+    setEditingDeptId(id);
+    setEditDeptName(name);
+  };
+  const saveEditDept = (id: string) => {
+    if (!editDeptName.trim()) return;
+    updateDepartment(id, editDeptName.trim());
+    setEditingDeptId(null);
+  };
+
+  const startEditCard = (id: string, label: string, last4: string) => {
+    setEditingCardId(id);
+    setEditCardLabel(label);
+    setEditCardLast4(last4);
+  };
+  const saveEditCard = (id: string) => {
+    if (!editCardLabel.trim() || !editCardLast4.trim()) return;
+    updateCorporateCard(id, editCardLabel.trim(), editCardLast4.trim());
+    setEditingCardId(null);
+  };
+
   return (
     <div className="space-y-6">
       
       {/* 1. Header */}
       <div>
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-bold text-slate-900">기준정보 & 시스템 설정</h2>
+          <h2 className="text-xl font-bold text-slate-900">시스템 설정</h2>
         </div>
         <p className="text-xs text-slate-500 mt-0.5">
           16개 담당부서 고정목록 · 6개 법인카드 관리 · 사용자 계정 및 권한(주/부/보조 관리자) 설정
@@ -103,21 +137,60 @@ export const SettingsView: React.FC = () => {
                 key={dept.id}
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs"
               >
-                <span className="font-semibold text-slate-800 truncate">
-                  {idx + 1}. {dept.name}
-                </span>
-                {canEdit && (
-                  <button
-                    onClick={() => {
-                      if (confirm(`[${dept.name}] 부서를 삭제하시겠습니까?`)) {
-                        deleteDepartment(dept.id);
-                      }
-                    }}
-                    className="text-slate-400 hover:text-rose-600 p-0.5"
-                    title="삭제"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                {editingDeptId === dept.id ? (
+                  <div className="flex w-full items-center gap-1">
+                    <input
+                      type="text"
+                      value={editDeptName}
+                      onChange={(e) => setEditDeptName(e.target.value)}
+                      className="w-full rounded-sm border border-indigo-300 px-1.5 py-0.5 text-xs"
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => saveEditDept(dept.id)}
+                      className="shrink-0 rounded bg-emerald-600 p-0.5 text-white"
+                      title="저장"
+                    >
+                      <Check className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => setEditingDeptId(null)}
+                      className="shrink-0 rounded bg-slate-200 p-0.5 text-slate-600"
+                      title="취소"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <span className="font-semibold text-slate-800 truncate">
+                      {idx + 1}. {dept.name}
+                    </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {canEdit && (
+                        <button
+                          onClick={() => startEditDept(dept.id, dept.name)}
+                          className="text-slate-400 hover:text-indigo-600 p-0.5"
+                          title="수정"
+                        >
+                          <Edit2 className="h-3 w-3" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`[${dept.name}] 부서를 삭제하시겠습니까?`)) {
+                              deleteDepartment(dept.id);
+                            }
+                          }}
+                          className="text-slate-400 hover:text-rose-600 p-0.5"
+                          title="삭제"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             ))}
@@ -169,29 +242,76 @@ export const SettingsView: React.FC = () => {
                 key={card.id}
                 className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-xs"
               >
-                <div className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
-                    <CreditCard className="h-3.5 w-3.5" />
+                {editingCardId === card.id ? (
+                  <div className="flex w-full items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={editCardLabel}
+                      onChange={(e) => setEditCardLabel(e.target.value)}
+                      placeholder="카드명"
+                      className="w-24 rounded-sm border border-indigo-300 px-1.5 py-0.5 text-xs"
+                      autoFocus
+                    />
+                    <input
+                      type="text"
+                      value={editCardLast4}
+                      onChange={(e) => setEditCardLast4(e.target.value)}
+                      placeholder="뒷4자리"
+                      className="w-16 rounded-sm border border-indigo-300 px-1.5 py-0.5 text-xs font-mono"
+                    />
+                    <button
+                      onClick={() => saveEditCard(card.id)}
+                      className="shrink-0 rounded bg-emerald-600 p-0.5 text-white"
+                      title="저장"
+                    >
+                      <Check className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setEditingCardId(null)}
+                      className="shrink-0 rounded bg-slate-200 p-0.5 text-slate-600"
+                      title="취소"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
                   </div>
-                  <div>
-                    <span className="font-bold text-slate-900">{card.label}</span>
-                    <span className="ml-2 font-mono text-indigo-700 font-semibold">
-                      (끝자리: {card.last4})
-                    </span>
-                  </div>
-                </div>
-                {canEdit && (
-                  <button
-                    onClick={() => {
-                      if (confirm(`[${card.label}] 법인카드를 삭제하시겠습니까?`)) {
-                        deleteCorporateCard(card.id);
-                      }
-                    }}
-                    className="text-slate-400 hover:text-rose-600 p-1"
-                    title="삭제"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-md bg-indigo-100 text-indigo-700">
+                        <CreditCard className="h-3.5 w-3.5" />
+                      </div>
+                      <div>
+                        <span className="font-bold text-slate-900">{card.label}</span>
+                        <span className="ml-2 font-mono text-indigo-700 font-semibold">
+                          (끝자리: {card.last4})
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      {canEdit && (
+                        <button
+                          onClick={() => startEditCard(card.id, card.label, card.last4)}
+                          className="text-slate-400 hover:text-indigo-600 p-1"
+                          title="수정"
+                        >
+                          <Edit2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button
+                          onClick={() => {
+                            if (confirm(`[${card.label}] 법인카드를 삭제하시겠습니까?`)) {
+                              deleteCorporateCard(card.id);
+                            }
+                          }}
+                          className="text-slate-400 hover:text-rose-600 p-1"
+                          title="삭제"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </>
                 )}
               </div>
             ))}
@@ -200,18 +320,24 @@ export const SettingsView: React.FC = () => {
 
       </div>
 
-      {/* 3. 사용자 및 권한 관리 (4절) */}
+      {/* 3. 사용자 및 권한 관리 */}
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-2xs space-y-4">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <Users className="h-5 w-5 text-indigo-600" />
             <div>
-              <h3 className="text-sm font-bold text-slate-900">사용자 계정 및 역할 기반 권한 (4절)</h3>
+              <h3 className="text-sm font-bold text-slate-900">사용자 계정 및 역할 기반 권한</h3>
               <p className="text-xs text-slate-500">
                 주관리자(Super Admin) · 부관리자(Sub Admin) · 보조관리자(Assistant Admin)
               </p>
             </div>
           </div>
+          {!isSuperAdmin && (
+            <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500 flex items-center gap-1">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              권한 편집은 주관리자만 가능
+            </span>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -254,43 +380,59 @@ export const SettingsView: React.FC = () => {
 
                 <div className="mt-2 text-xs text-slate-600 space-y-1">
                   <div>소속부서: {u.department}</div>
-                  <div>이메일: {u.email}</div>
                   <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-200/60">
                     {u.role === 'super_admin' && '모든 데이터 CRUD + 연도관리 + 승인결재'}
                     {u.role === 'sub_admin' && '직접 수정/삭제 가능 + 보조관리자 요청 승인/반려'}
-                    {u.role === 'assistant_admin' && '신규등록 즉시반영, 수정/삭제는 승인요청 생성'}
+                    {u.role === 'assistant_admin' && '신규등록 즉시반영, 수정/삭제는 요청 후 승인 필요'}
                   </div>
                 </div>
 
-                {/* 탭별 수정 권한 체크박스 (주관리자는 항상 전체 허용이라 설정 불필요) */}
+                {/* 탭별 수정/삭제 권한 체크박스 (주관리자만 편집 가능, 주관리자 본인은 항상 전체 허용이라 설정 불필요) */}
                 {u.role !== 'super_admin' && (
                   <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2.5">
-                    <div className="text-[11px] font-bold text-slate-600 mb-1.5">메뉴별 수정 권한</div>
-                    <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-                      {TAB_PERMISSION_OPTIONS.map((tab) => {
-                        const checked = (u.tab_permissions || []).includes(tab.id);
-                        return (
-                          <label
-                            key={tab.id}
-                            className="flex items-center gap-1.5 text-[11px] text-slate-700 cursor-pointer select-none"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={checked}
-                              onChange={(e) => {
-                                const current = u.tab_permissions || [];
-                                const next: AppTabId[] = e.target.checked
-                                  ? [...current, tab.id]
-                                  : current.filter((t) => t !== tab.id);
-                                updateUserTabPermissions(u.uid, next);
-                              }}
-                              className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
-                            />
-                            {tab.label}
-                          </label>
-                        );
-                      })}
-                    </div>
+                    <div className="text-[11px] font-bold text-slate-600 mb-1.5">메뉴별 수정/삭제 권한</div>
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="text-slate-400">
+                          <th className="text-left font-medium pb-1">메뉴</th>
+                          <th className="w-10 font-medium pb-1">수정</th>
+                          <th className="w-10 font-medium pb-1">삭제</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {TAB_PERMISSION_OPTIONS.map((tab) => {
+                          const editChecked = !!u.tab_permissions?.[tab.id]?.edit;
+                          const deleteChecked = !!u.tab_permissions?.[tab.id]?.delete;
+                          return (
+                            <tr key={tab.id} className="border-t border-slate-100">
+                              <td className="py-1 text-slate-700">{tab.label}</td>
+                              <td className="text-center">
+                                <input
+                                  type="checkbox"
+                                  disabled={!isSuperAdmin}
+                                  checked={editChecked}
+                                  onChange={(e) =>
+                                    updateUserTabPermission(u.uid, tab.id, 'edit', e.target.checked)
+                                  }
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                                />
+                              </td>
+                              <td className="text-center">
+                                <input
+                                  type="checkbox"
+                                  disabled={!isSuperAdmin}
+                                  checked={deleteChecked}
+                                  onChange={(e) =>
+                                    updateUserTabPermission(u.uid, tab.id, 'delete', e.target.checked)
+                                  }
+                                  className="h-3.5 w-3.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                                />
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

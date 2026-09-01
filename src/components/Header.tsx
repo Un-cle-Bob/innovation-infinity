@@ -45,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
         return {
           label: '보조관리자 (실무자)',
           bg: 'bg-amber-100 text-amber-800 border-amber-300',
-          desc: '신규등록 즉시반영, 수정/삭제는 승인요청 생성',
+          desc: '신규등록 즉시반영, 수정/삭제는 요청 후 승인 필요',
         };
     }
   };
@@ -117,10 +117,10 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
                     ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100 animate-pulse'
                     : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                 }`}
-                title="보조관리자 수정/삭제 승인요청 목록 (마스터 4절)"
+                title="보조관리자 수정/삭제 요청 목록"
               >
                 <Bell className="h-3.5 w-3.5" />
-                <span>승인요청</span>
+                <span>수정요청</span>
                 {pendingApprovalCount > 0 && (
                   <span className="ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-bold text-white">
                     {pendingApprovalCount}
