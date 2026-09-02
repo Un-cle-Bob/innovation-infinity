@@ -8,7 +8,7 @@ interface NewYearModalProps {
 }
 
 export const NewYearModal: React.FC<NewYearModalProps> = ({ isOpen, onClose }) => {
-  const { currentYear, yearList, createNewYear } = useApp();
+  const { currentYear, yearList, createNewYear, showToast } = useApp();
   const [newYear, setNewYear] = useState<number>(currentYear + 1);
   const [sourceYear, setSourceYear] = useState<number>(currentYear);
 
@@ -17,11 +17,11 @@ export const NewYearModal: React.FC<NewYearModalProps> = ({ isOpen, onClose }) =
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (yearList.includes(newYear)) {
-      alert(`${newYear}년은 이미 등록되어 있는 연도입니다.`);
+      showToast(`${newYear}년은 이미 등록되어 있는 연도입니다.`, 'error');
       return;
     }
     if (newYear < 2020 || newYear > 2040) {
-      alert('올바른 연도를 입력해주세요 (2020~2040).');
+      showToast('올바른 연도를 입력해주세요 (2020~2040).', 'error');
       return;
     }
     createNewYear(newYear, sourceYear);

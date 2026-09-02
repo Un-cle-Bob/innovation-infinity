@@ -25,8 +25,8 @@ import {
 export const ReportsView: React.FC = () => {
   const { currentYear, tasks, executions, programs, achievements, kpis } = useApp();
 
-  // KPI 보고서용: 지표 → 세부지표 → 측정지표 → 세부측정지표를 총괄표처럼 왼쪽 고정열(rowSpan)로 펼쳐서 보여주기 위한
-  // 평탄화(flatten) 계산. 각 행은 세부측정지표 1개(또는 측정지표 자체 소계 1행)에 대응한다.
+  // KPI 보고서용: 자율성과지표 → 세부지표 2단계만 총괄표처럼 왼쪽 고정열(rowSpan)로 펼쳐서 보여주기 위한 평탄화 계산.
+  // (측정지표/세부측정지표는 보고서에서는 생략 — 상세는 성과지표 관리 화면에서 확인)
   const kpiReportRows = useMemo(() => {
     type Row = {
       key: string;
@@ -38,96 +38,28 @@ export const ReportsView: React.FC = () => {
       kpiActual: number;
       kpiAchRate: number;
       detailName: string;
-      detailRowSpan: number;
-      isDetailFirst: boolean;
       detailBaseline: number;
       detailTarget: number | null;
       detailActual: number;
-      measureName: string;
-      measureRowSpan: number;
-      isMeasureFirst: boolean;
-      subLabel: string;
-      isMeasureSelf: boolean;
-      baseline: number | string | null | undefined;
-      target: number | string | null | undefined;
-      actual: number | string | null | undefined;
     };
     const rows: Row[] = [];
 
     kpis.forEach((kpi, kIdx) => {
-      const measureRowsCount = (m: (typeof kpi.details)[number]['measures'][number]) =>
-        1 + m.sub_measures.length;
-      const detailRowsCount = (d: (typeof kpi.details)[number]) =>
-        d.measures.reduce((sum, m) => sum + measureRowsCount(m), 0);
-      const kpiRowSpan = kpi.details.reduce((sum, d) => sum + detailRowsCount(d), 0) || 1;
-
-      let kpiRowUsed = false;
+      const kpiRowSpan = kpi.details.length || 1;
       kpi.details.forEach((d, dIdx) => {
-        const detailRowSpan = detailRowsCount(d) || 1;
-        let detailRowUsed = false;
-        const detailTarget = d.target ?? d.recommended_value ?? null;
-
-        d.measures.forEach((m, mIdx) => {
-          const measureRowSpan = measureRowsCount(m);
-          let measureRowUsed = false;
-
-          // 측정지표 자체 소계 행
-          rows.push({
-            key: `${kpi.id}-${d.id}-${m.id}-self`,
-            kpiName: `${kIdx + 1}. ${kpi.name}`,
-            kpiRowSpan,
-            isKpiFirst: !kpiRowUsed,
-            kpiBaseline: kpi.baseline,
-            kpiTarget: kpi.target,
-            kpiActual: kpi.actual,
-            kpiAchRate: kpi.achievement * 100,
-            detailName: `${kIdx + 1}-${dIdx + 1}. ${d.name}`,
-            detailRowSpan,
-            isDetailFirst: !detailRowUsed,
-            detailBaseline: d.baseline,
-            detailTarget,
-            detailActual: d.actual,
-            measureName: `${kIdx + 1}-${dIdx + 1}-${mIdx + 1}) ${m.name}`,
-            measureRowSpan,
-            isMeasureFirst: true,
-            subLabel: '(측정지표 자체 소계)',
-            isMeasureSelf: true,
-            baseline: m.baseline,
-            target: '-',
-            actual: m.actual,
-          });
-          kpiRowUsed = true;
-          detailRowUsed = true;
-          measureRowUsed = true;
-
-          m.sub_measures.forEach((sm) => {
-            rows.push({
-              key: sm.id,
-              kpiName: `${kIdx + 1}. ${kpi.name}`,
-              kpiRowSpan,
-              isKpiFirst: !kpiRowUsed,
-              kpiBaseline: kpi.baseline,
-              kpiTarget: kpi.target,
-              kpiActual: kpi.actual,
-              kpiAchRate: kpi.achievement * 100,
-              detailName: `${kIdx + 1}-${dIdx + 1}. ${d.name}`,
-              detailRowSpan,
-              isDetailFirst: !detailRowUsed,
-              detailBaseline: d.baseline,
-              detailTarget,
-              detailActual: d.actual,
-              measureName: `${kIdx + 1}-${dIdx + 1}-${mIdx + 1}) ${m.name}`,
-              measureRowSpan,
-              isMeasureFirst: false,
-              subLabel: sm.name,
-              isMeasureSelf: false,
-              baseline: sm.baseline,
-              target: sm.recommended_value,
-              actual: sm.actual,
-            });
-            kpiRowUsed = true;
-            detailRowUsed = true;
-          });
+        rows.push({
+          key: d.id,
+          kpiName: `${kIdx + 1}. ${kpi.name}`,
+          kpiRowSpan,
+          isKpiFirst: dIdx === 0,
+          kpiBaseline: kpi.baseline,
+          kpiTarget: kpi.target,
+          kpiActual: kpi.actual,
+          kpiAchRate: kpi.achievement * 100,
+          detailName: `${kIdx + 1}-${dIdx + 1}. ${d.name}`,
+          detailBaseline: d.baseline,
+          detailTarget: d.target ?? d.recommended_value ?? null,
+          detailActual: d.actual,
         });
       });
     });
@@ -1219,23 +1151,19 @@ export const ReportsView: React.FC = () => {
                 1. 대학혁신 5대 자율성과지표(KPI) 종합 달성 현황
               </h3>
 
-              {/* 지표 → 세부지표 → 측정지표 → 세부측정지표를 총괄표처럼 왼쪽 고정열(rowSpan)로 펼쳐서 표시 */}
+              {/* 자율성과지표 → 세부지표 2단계만 총괄표처럼 왼쪽 고정열(rowSpan)로 간결하게 표시 */}
               <table className="w-full text-[11px] text-left border-collapse border border-slate-400 table-fixed">
                 <colgroup>
-                  <col style={{ width: '15%' }} />
-                  <col style={{ width: '16%' }} />
-                  <col style={{ width: '17%' }} />
-                  <col style={{ width: '18%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '11%' }} />
-                  <col style={{ width: '12%' }} />
+                  <col style={{ width: '30%' }} />
+                  <col style={{ width: '30%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '13%' }} />
+                  <col style={{ width: '14%' }} />
                 </colgroup>
                 <thead className="bg-slate-200 font-bold text-slate-800 text-center">
                   <tr>
                     <th className="border border-slate-400 p-1.5 text-left">자율성과지표</th>
                     <th className="border border-slate-400 p-1.5 text-left">세부지표</th>
-                    <th className="border border-slate-400 p-1.5 text-left">측정지표</th>
-                    <th className="border border-slate-400 p-1.5 text-left">세부측정지표</th>
                     <th className="border border-slate-400 p-1.5">기준값</th>
                     <th className="border border-slate-400 p-1.5">목표값</th>
                     <th className="border border-slate-400 p-1.5">실적값</th>
@@ -1243,11 +1171,11 @@ export const ReportsView: React.FC = () => {
                 </thead>
                 <tbody>
                   {kpiReportRows.map((row) => (
-                    <tr key={row.key} className={row.isMeasureSelf ? 'bg-slate-50' : 'bg-white'}>
+                    <tr key={row.key} className="bg-white">
                       {row.isKpiFirst && (
                         <td
                           rowSpan={row.kpiRowSpan}
-                          className="border border-slate-400 p-1.5 align-top bg-indigo-50 font-extrabold text-slate-900"
+                          className="border border-slate-400 p-2 align-top bg-indigo-50 font-extrabold text-slate-900"
                         >
                           <div>{row.kpiName}</div>
                           <div className="mt-1.5 font-normal text-[10px] text-slate-500 space-y-0.5">
@@ -1256,49 +1184,25 @@ export const ReportsView: React.FC = () => {
                           </div>
                         </td>
                       )}
-                      {row.isDetailFirst && (
-                        <td
-                          rowSpan={row.detailRowSpan}
-                          className="border border-slate-400 p-1.5 align-top font-bold text-slate-800"
-                        >
-                          <div>{row.detailName}</div>
-                          <div className="mt-1 font-normal text-[10px] text-slate-500">
-                            기준 {row.detailBaseline} · 목표 {row.detailTarget ?? '-'} · 실적 {row.detailActual}
-                          </div>
-                        </td>
-                      )}
-                      {row.isMeasureFirst && (
-                        <td
-                          rowSpan={row.measureRowSpan}
-                          className="border border-slate-400 p-1.5 align-top text-slate-700"
-                        >
-                          {row.measureName}
-                        </td>
-                      )}
-                      <td
-                        className={`border border-slate-400 p-1.5 ${
-                          row.isMeasureSelf ? 'italic text-slate-400' : 'text-slate-600'
-                        }`}
-                      >
-                        {row.isMeasureSelf ? row.subLabel : `· ${row.subLabel}`}
+                      <td className="border border-slate-400 p-2 font-semibold text-slate-800">
+                        {row.detailName}
                       </td>
-                      <td className="border border-slate-400 p-1.5 text-center font-mono text-slate-600">
-                        {row.baseline ?? '-'}
+                      <td className="border border-slate-400 p-2 text-center font-mono text-slate-600">
+                        {row.detailBaseline}
                       </td>
-                      <td className="border border-slate-400 p-1.5 text-center font-mono text-slate-600">
-                        {row.target ?? '-'}
+                      <td className="border border-slate-400 p-2 text-center font-mono text-slate-600">
+                        {row.detailTarget ?? '-'}
                       </td>
-                      <td className="border border-slate-400 p-1.5 text-center font-mono font-semibold text-slate-800">
-                        {row.actual ?? '-'}
+                      <td className="border border-slate-400 p-2 text-center font-mono font-semibold text-slate-800">
+                        {row.detailActual}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               <p className="text-[10px] text-slate-400 mt-1.5">
-                ※ 목표값은 자율성과지표·세부지표까지만 존재합니다(측정지표·세부측정지표는 성과지표 관리대장 원본에
-                목표값 항목이 없어, 세부측정지표는 참고용 권장값을 대신 표시했습니다). 달성도는 목표 대비 실적
-                개념이 있는 최상위 자율성과지표에만 표시됩니다.
+                ※ 측정지표·세부측정지표 단위의 상세 실적값은 성과지표(KPI) 화면에서 확인하실 수 있습니다. 달성도는
+                목표 대비 실적 개념이 있는 최상위 자율성과지표에만 표시됩니다.
               </p>
             </div>
             )}

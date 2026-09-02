@@ -71,6 +71,7 @@ export const ProgramsView: React.FC = () => {
     currentUser,
     canEditTab,
     canDeleteTab,
+    showToast,
   } = useApp();
 
   const canEdit = canEditTab('programs');
@@ -96,7 +97,7 @@ export const ProgramsView: React.FC = () => {
   const [itemCode, setItemCode] = useState<string>('IA-1-1-1');
   const [name, setName] = useState<string>('');
   const [roundLabel, setRoundLabel] = useState<string>('1차');
-  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('');
+  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('혁신-202');
   const [department, setDepartment] = useState<string>('입학취업처');
   const [manager, setManager] = useState<string>('');
   const [scheduleStart, setScheduleStart] = useState<string>('2026-03-01');
@@ -104,7 +105,7 @@ export const ProgramsView: React.FC = () => {
   const [budget, setBudget] = useState<number | ''>('');
   const [allocatedAmount, setAllocatedAmount] = useState<number | ''>('');
   const [status, setStatus] = useState<ItemStatus>('예정');
-  const [resultReportDocNumber, setResultReportDocNumber] = useState<string>('');
+  const [resultReportDocNumber, setResultReportDocNumber] = useState<string>('혁신-202');
   const [participants, setParticipants] = useState<number | ''>('');
   const [participantsUnit, setParticipantsUnit] = useState<string>('명');
   const [satisfactionScore, setSatisfactionScore] = useState<number | ''>('');
@@ -473,7 +474,7 @@ export const ProgramsView: React.FC = () => {
         }
       }
       setName('');
-      setInternalApprovalDocNumber(initialDocNumber || '');
+      setInternalApprovalDocNumber(initialDocNumber || '혁신-202');
       setBudget('');
       setAllocatedAmount('');
     }
@@ -483,7 +484,7 @@ export const ProgramsView: React.FC = () => {
     setScheduleStart('2026-03-01');
     setScheduleEnd('2026-06-30');
     setStatus('진행중');
-    setResultReportDocNumber('');
+    setResultReportDocNumber('혁신-202');
     setParticipants('');
     setParticipantsUnit('명');
     setSatisfactionScore('');
@@ -508,10 +509,10 @@ export const ProgramsView: React.FC = () => {
     const newBudget = Number(budget) || 0;
     const overageCheck = checkProgramBudgetOverage(taskCode, newBudget);
     if (overageCheck.exceeds) {
-      alert(
-        `배정예산이 세부과제 예산을 초과합니다.\n\n세부과제 총예산: ₩${overageCheck.taskBudget.toLocaleString()}\n` +
-          `이미 배정된 다른 프로그램 합계: ₩${overageCheck.alreadyAllocated.toLocaleString()}\n` +
-          `초과액: ₩${overageCheck.exceedAmount.toLocaleString()}\n\n금액을 줄여서 다시 시도해주세요.`
+      showToast(
+        `배정예산이 세부과제 예산을 초과합니다. (세부과제 총예산 ₩${overageCheck.taskBudget.toLocaleString()} / ` +
+          `기배정 ₩${overageCheck.alreadyAllocated.toLocaleString()} / 초과액 ₩${overageCheck.exceedAmount.toLocaleString()})`,
+        'error'
       );
       return;
     }
@@ -590,10 +591,10 @@ export const ProgramsView: React.FC = () => {
     const newBudget = Number(editAllocatedBudget) || 0;
     const check = checkProgramBudgetOverage(budgetEditTarget.task_code, newBudget, budgetEditTarget.id);
     if (check.exceeds) {
-      alert(
-        `배정예산이 세부과제 예산을 초과합니다.\n\n세부과제 총예산: ₩${check.taskBudget.toLocaleString()}\n` +
-          `이미 배정된 다른 프로그램 합계: ₩${check.alreadyAllocated.toLocaleString()}\n` +
-          `초과액: ₩${check.exceedAmount.toLocaleString()}\n\n금액을 줄여서 다시 시도해주세요.`
+      showToast(
+        `배정예산이 세부과제 예산을 초과합니다. (세부과제 총예산 ₩${check.taskBudget.toLocaleString()} / ` +
+          `기배정 ₩${check.alreadyAllocated.toLocaleString()} / 초과액 ₩${check.exceedAmount.toLocaleString()})`,
+        'error'
       );
       return;
     }

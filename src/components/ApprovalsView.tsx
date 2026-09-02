@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const ApprovalsView: React.FC = () => {
-  const { approvalRequests, approveRequest, rejectRequest, currentUser } = useApp();
+  const { approvalRequests, approveRequest, rejectRequest, currentUser, showToast } = useApp();
 
   const [selectedStatus, setSelectedStatus] = useState<'pending' | 'approved' | 'rejected' | 'all'>(
     'pending'
@@ -36,7 +36,7 @@ export const ApprovalsView: React.FC = () => {
   const handleConfirmReject = () => {
     if (!rejectModalReq) return;
     if (!rejectReason.trim()) {
-      alert('반려 사유를 입력해주세요.');
+      showToast('반려 사유를 입력해주세요.', 'error');
       return;
     }
     rejectRequest(rejectModalReq.id, rejectReason.trim());

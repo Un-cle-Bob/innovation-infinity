@@ -54,6 +54,7 @@ export const TasksView: React.FC = () => {
     deleteItem,
     canEditTab,
     canDeleteTab,
+    showToast,
   } = useApp();
 
   const canEditTasks = canEditTab('tasks');
@@ -231,7 +232,7 @@ export const TasksView: React.FC = () => {
       setBudgetImportResult(result);
       setIsBudgetImportModalOpen(true);
     } catch (err) {
-      alert('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 다시 확인해주세요.');
+      showToast('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 다시 확인해주세요.', 'error');
     } finally {
       e.target.value = '';
     }

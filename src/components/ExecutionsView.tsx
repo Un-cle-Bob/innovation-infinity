@@ -60,6 +60,7 @@ export const ExecutionsView: React.FC = () => {
     deleteExecution,
     canEditTab,
     canDeleteTab,
+    showToast,
   } = useApp();
 
   const canEdit = canEditTab('executions');
@@ -100,8 +101,8 @@ export const ExecutionsView: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'계좌이체' | '법인카드'>('법인카드');
   const [cardId, setCardId] = useState<string>('card1');
   const [payee, setPayee] = useState<string>('');
-  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('');
-  const [invoiceDocNumber, setInvoiceDocNumber] = useState<string>('');
+  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('혁신-202');
+  const [invoiceDocNumber, setInvoiceDocNumber] = useState<string>('혁신-202');
   const [voucherApprovalNumber, setVoucherApprovalNumber] = useState<string>('');
   const [flag, setFlag] = useState<SignalFlag>('green');
   const [flagNote, setFlagNote] = useState<string>('');
@@ -247,7 +248,7 @@ export const ExecutionsView: React.FC = () => {
       setImportResults(results);
       setIsImportModalOpen(true);
     } catch (err) {
-      alert('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 다시 확인해주세요.');
+      showToast('엑셀 파일을 읽는 중 오류가 발생했습니다. 양식을 다시 확인해주세요.', 'error');
     } finally {
       e.target.value = '';
     }
@@ -270,8 +271,9 @@ export const ExecutionsView: React.FC = () => {
     setIsImporting(false);
     setIsImportModalOpen(false);
     setImportResults(null);
-    alert(
-      `일괄등록이 끝났습니다.\n성공: ${successCount}건${failCount > 0 ? `\n실패(예산 초과 등): ${failCount}건` : ''}`
+    showToast(
+      `일괄등록이 끝났습니다. 성공 ${successCount}건${failCount > 0 ? ` / 실패(예산 초과 등) ${failCount}건` : ''}`,
+      failCount > 0 ? 'error' : 'success'
     );
   };
 
@@ -294,8 +296,8 @@ export const ExecutionsView: React.FC = () => {
     setPaymentMethod('법인카드');
     setCardId('card1');
     setPayee('');
-    setInternalApprovalDocNumber('');
-    setInvoiceDocNumber('');
+    setInternalApprovalDocNumber('혁신-202');
+    setInvoiceDocNumber('혁신-202');
     setVoucherApprovalNumber('');
     setFlag('green');
     setFlagNote('');
