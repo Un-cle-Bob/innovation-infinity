@@ -75,6 +75,7 @@ interface AppContextType {
   updateItem: (taskCode: string, itemCode: string, name: string, department: string) => void;
   addTask: (domain: string, code: string, name: string, detail: string) => boolean;
   updateTaskInfo: (taskCode: string, name: string, detail: string) => void;
+  updateTaskCostBasis: (taskCode: string, category: string, content: string) => void;
   deleteTask: (taskCode: string) => void;
   addItem: (taskCode: string, itemCode: string, name: string, department: string) => boolean;
   deleteItem: (taskCode: string, itemCode: string) => void;
@@ -521,6 +522,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { ...prev, tasks: { ...prev.tasks, [taskCode]: { ...target, name, detail } } };
     });
     showToast(`세부과제 [${taskCode}] 정보가 수정되었습니다.`, 'success');
+  };
+
+  /** 세부과제의 비목별 산출내역(산출근거) 텍스트를 수정 */
+  const updateTaskCostBasis = (taskCode: string, category: string, content: string) => {
+    mutateYearData((prev) => {
+      const target = prev.tasks[taskCode];
+      if (!target) return prev;
+      return {
+        ...prev,
+        tasks: {
+          ...prev.tasks,
+          [taskCode]: {
+            ...target,
+            cost_basis: { ...target.cost_basis, [category]: content },
+          },
+        },
+      };
+    });
   };
 
   const deleteTask = (taskCode: string) => {
@@ -1225,6 +1244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateItem,
         addTask,
         updateTaskInfo,
+        updateTaskCostBasis,
         deleteTask,
         addItem,
         deleteItem,

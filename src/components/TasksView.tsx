@@ -51,6 +51,7 @@ export const TasksView: React.FC = () => {
     updateItem,
     addTask,
     updateTaskInfo,
+    updateTaskCostBasis,
     deleteTask,
     addItem,
     deleteItem,
@@ -72,6 +73,8 @@ export const TasksView: React.FC = () => {
   const [editingTaskCode, setEditingTaskCode] = useState<string | null>(null);
   const [deleteTaskTarget, setDeleteTaskTarget] = useState<Task | null>(null);
   const [deleteItemTarget, setDeleteItemTarget] = useState<{ taskCode: string; item: TaskItem } | null>(null);
+  const [editingCostBasisTaskCode, setEditingCostBasisTaskCode] = useState<string | null>(null);
+  const [costBasisDraft, setCostBasisDraft] = useState<{ [category: string]: string }>({});
   const [editTaskName, setEditTaskName] = useState('');
   const [editTaskDetail, setEditTaskDetail] = useState('');
 
@@ -702,6 +705,85 @@ export const TasksView: React.FC = () => {
                   {/* Expanded Details Body */}
                   {isExpanded && (
                     <div className="p-4 bg-slate-50/50 space-y-4">
+                      {/* 0) 산출내역 (비목별 산출근거) */}
+                      <div className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-2xs">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                          <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-indigo-600" />
+                            <h4 className="text-xs font-bold text-slate-800">산출내역</h4>
+                            <span className="text-[11px] text-slate-400">비목별 예산 산출근거</span>
+                          </div>
+                          {canEditTasks && editingCostBasisTaskCode !== task.code && (
+                            <button
+                              onClick={() => {
+                                setEditingCostBasisTaskCode(task.code);
+                                setCostBasisDraft({ ...(task.cost_basis || {}) });
+                              }}
+                              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                              <Edit3 className="h-3 w-3" />
+                              수정
+                            </button>
+                          )}
+                          {editingCostBasisTaskCode === task.code && (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => {
+                                  EXPENSE_CATEGORIES.forEach((cat) => {
+                                    updateTaskCostBasis(task.code, cat, costBasisDraft[cat] || '');
+                                  });
+                                  setEditingCostBasisTaskCode(null);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+                              >
+                                <Check className="h-3 w-3" />
+                                저장
+                              </button>
+                              <button
+                                onClick={() => setEditingCostBasisTaskCode(null)}
+                                className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-300"
+                              >
+                                <X className="h-3 w-3" />
+                                취소
+                              </button>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="mt-2 divide-y divide-slate-100">
+                          {EXPENSE_CATEGORIES.map((cat) => {
+                            const isEditingThis = editingCostBasisTaskCode === task.code;
+                            const content = isEditingThis
+                              ? costBasisDraft[cat] || ''
+                              : task.cost_basis?.[cat] || '';
+                            return (
+                              <div key={cat} className="flex gap-3 py-2">
+                                <div className="w-28 shrink-0 pt-0.5">
+                                  <span className="text-[11px] font-bold text-slate-700">{cat}</span>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {isEditingThis ? (
+                                    <textarea
+                                      value={content}
+                                      onChange={(e) =>
+                                        setCostBasisDraft((prev) => ({ ...prev, [cat]: e.target.value }))
+                                      }
+                                      rows={2}
+                                      placeholder="산출근거를 입력하세요 (예: 강사비 300,000원×3건=900,000원)"
+                                      className="w-full rounded-md border border-indigo-300 px-2 py-1.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                                    />
+                                  ) : (
+                                    <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
+                                      {content || <span className="text-slate-300">-</span>}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                       {/* 1) 7비목 x 3재원 실시간 잔액표 */}
                       <div className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-2xs">
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100">

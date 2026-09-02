@@ -97,6 +97,8 @@ export interface Task {
   budget_total: number;
   budget_matrix: TaskBudgetMatrix;
   items: { [itemCode: string]: TaskItem };
+  /** 비목별 산출내역(산출근거) 텍스트. 키는 비목명(ExpenseCategory) */
+  cost_basis?: { [category: string]: string };
 }
 
 export interface FundAllocation {

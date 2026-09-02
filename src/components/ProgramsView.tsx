@@ -22,7 +22,7 @@ import {
   FileText,
   Link,
   Sparkles,
-  DollarSign,
+  Settings2,
   ChevronDown,
   ArrowUp,
   ArrowDown,
@@ -1527,7 +1527,7 @@ export const ProgramsView: React.FC = () => {
                                 className="text-slate-400 hover:text-emerald-600 p-1 rounded hover:bg-emerald-50 transition-colors"
                                 title="프로그램 전체 수정 (명칭·예산·일정·문서번호·실적 등)"
                               >
-                                <DollarSign className="h-3.5 w-3.5" />
+                                <Settings2 className="h-3.5 w-3.5" />
                               </button>
                             )}
                             {canDelete && (
