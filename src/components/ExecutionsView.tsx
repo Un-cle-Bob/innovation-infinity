@@ -573,15 +573,15 @@ export const ExecutionsView: React.FC = () => {
           </div>
         </div>
 
-        {/* Second Row: 정렬 + 영역/세부과제/비목 필터 (표테이블 헤더 필터 대체) */}
-        <div className="flex flex-wrap items-center gap-3 pt-2.5 mt-2.5 border-t border-slate-100 text-xs w-full">
+        {/* Second Row: 정렬 + 영역/세부과제/비목/세목 필터 (표테이블 헤더 필터 대체) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-2.5 mt-2.5 border-t border-slate-100 text-xs w-full">
           {/* 정렬 기준 + 방향 */}
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-600">정렬:</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-semibold text-slate-600 shrink-0">정렬:</span>
             <select
               value={sortKey === 'manageNo' || sortKey === 'date' || sortKey === 'created_at' ? sortKey : 'created_at'}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             >
               <option value="created_at">등록일순 (정렬없음, 기본)</option>
               <option value="date">집행일자순</option>
@@ -589,7 +589,7 @@ export const ExecutionsView: React.FC = () => {
             </select>
             <button
               onClick={() => setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'))}
-              className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
               {sortDirection === 'asc' ? (
                 <>
@@ -606,12 +606,12 @@ export const ExecutionsView: React.FC = () => {
           </div>
 
           {/* 영역 필터 */}
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-600">영역:</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-semibold text-slate-600 shrink-0">영역:</span>
             <select
               value={selectedDomainFilterExec}
               onChange={(e) => setSelectedDomainFilterExec(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             >
               <option value="ALL">전체 영역</option>
               {availableDomains.map((dom) => (
@@ -623,12 +623,12 @@ export const ExecutionsView: React.FC = () => {
           </div>
 
           {/* 세부과제 필터 */}
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-600">세부과제:</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-semibold text-slate-600 shrink-0">세부과제:</span>
             <select
               value={selectedTaskFilterExec}
               onChange={(e) => setSelectedTaskFilterExec(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             >
               <option value="ALL">전체 세부과제</option>
               {availableTaskCodes.map((tc) => (
@@ -640,12 +640,12 @@ export const ExecutionsView: React.FC = () => {
           </div>
 
           {/* 비목 필터 */}
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-600">비목:</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-semibold text-slate-600 shrink-0">비목:</span>
             <select
               value={selectedCategoryFilterExec}
               onChange={(e) => setSelectedCategoryFilterExec(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             >
               <option value="ALL">전체 비목</option>
               {EXPENSE_CATEGORIES.map((cat) => (
@@ -657,12 +657,12 @@ export const ExecutionsView: React.FC = () => {
           </div>
 
           {/* 세목 필터 */}
-          <div className="flex items-center gap-1.5">
-            <span className="font-semibold text-slate-600">세목:</span>
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-semibold text-slate-600 shrink-0">세목:</span>
             <select
               value={selectedSubCategoryFilterExec}
               onChange={(e) => setSelectedSubCategoryFilterExec(e.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+              className="min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             >
               <option value="ALL">전체 세목</option>
               {availableSubCategories.map((sc) => (
@@ -739,8 +739,8 @@ export const ExecutionsView: React.FC = () => {
                   </div>
                 </th>
 
-                {/* 주요추진항목 */}
-                <th className="py-2.5 px-3 min-w-[150px]">주요추진항목</th>
+                {/* 추진항목 */}
+                <th className="py-2.5 px-3 min-w-[150px]">추진항목</th>
 
                 {/* 담당부서 */}
                 <th className="py-2.5 px-3 w-24">담당부서</th>
@@ -944,7 +944,7 @@ export const ExecutionsView: React.FC = () => {
                         )}
                       </td>
 
-                      {/* 주요추진항목 (수정 가능) */}
+                      {/* 추진항목 (수정 가능) */}
                       <td className="py-2.5 px-3">
                         {isEditing ? (
                           <select
@@ -964,7 +964,11 @@ export const ExecutionsView: React.FC = () => {
                           </select>
                         ) : (
                           <div className="flex items-center gap-1">
-                            <span className="font-mono text-slate-500 font-bold text-[11px]">{exec.item_code}</span>
+                            <span
+                              className={`font-mono font-bold text-[11px] px-1 rounded ${domainTheme.bg} ${domainTheme.text}`}
+                            >
+                              {exec.item_code}
+                            </span>
                             <span className="truncate max-w-[130px] text-slate-700" title={item?.name}>
                               {item?.name || '-'}
                             </span>
@@ -1575,7 +1579,7 @@ export const ExecutionsView: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    주요추진항목 <span className="text-rose-500">*</span>
+                    추진항목 <span className="text-rose-500">*</span>
                   </label>
                   <select
                     value={selectedItemCode}

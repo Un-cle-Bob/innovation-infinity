@@ -9,20 +9,35 @@ export function recalculateKpiTree(kpis: KpiIndicator[]): KpiIndicator[] {
     const updatedDetails: KpiDetail[] = indicator.details.map((detail) => {
       // 2. 하위 측정지표(Measures) 계산
       const updatedMeasures: Measure[] = detail.measures.map((measure) => {
-        // 3. 하위 세부측정지표(SubMeasures) 기반 계산
+        // 3. 하위 세부측정지표(SubMeasures) 기반 계산 — 개별 가중치가 있으면 가중합, 없으면 단순평균
         const validSubs = measure.sub_measures.filter(
           (sm) => sm.actual !== null && sm.actual !== undefined && !isNaN(Number(sm.actual))
         );
 
         let measureActual = measure.actual;
+        let measureWeights = measure.weights;
         if (validSubs.length > 0) {
-          // 측정지표 실적값 = 하위 세부측정지표들의 평균 (또는 단일인 경우 그 값)
-          const sum = validSubs.reduce((acc, sm) => acc + Number(sm.actual), 0);
-          measureActual = Math.round((sum / validSubs.length) * 100) / 100;
+          if (!measureWeights || measureWeights.length !== measure.sub_measures.length || measureWeights.reduce((a, b) => a + b, 0) === 0) {
+            measureWeights = undefined;
+            // 균등 가중치(=단순평균)
+            const sum = validSubs.reduce((acc, sm) => acc + Number(sm.actual), 0);
+            measureActual = Math.round((sum / validSubs.length) * 100) / 100;
+          } else {
+            // 정규화된 가중치로 가중합 (실적이 없는 세부측정지표는 0으로 취급)
+            const totalW = measureWeights.reduce((a, b) => a + b, 0);
+            const normWeights = measureWeights.map((w) => w / totalW);
+            let weighted = 0;
+            measure.sub_measures.forEach((sm, idx) => {
+              const val = sm.actual !== null && sm.actual !== undefined && !isNaN(Number(sm.actual)) ? Number(sm.actual) : 0;
+              weighted += val * (normWeights[idx] ?? 0);
+            });
+            measureActual = Math.round(weighted * 100) / 100;
+          }
         }
 
         return {
           ...measure,
+          weights: measureWeights,
           actual: measureActual,
         };
       });

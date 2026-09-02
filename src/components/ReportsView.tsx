@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
-import { EXPENSE_CATEGORIES } from '../data/constants';
+import { ACHIEVEMENT_CATEGORIES, EXPENSE_CATEGORIES } from '../data/constants';
 import { getTaskBudgetSummary } from '../services/budgetEngine';
 import { Task, TaskItem } from '../types';
 import { getDomainCode, getDomainColorTheme, getExecutionManageNoMap } from '../utils/domainColors';
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 
 export const ReportsView: React.FC = () => {
-  const { currentYear, tasks, executions, programs, kpis } = useApp();
+  const { currentYear, tasks, executions, programs, achievements, kpis } = useApp();
 
   const [reportType, setReportType] = useState<'budget' | 'performance'>('budget');
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL');
@@ -193,6 +193,13 @@ export const ReportsView: React.FC = () => {
     });
   }, [programs, selectedDomain, isDateInPeriod]);
 
+  const filteredAchievements = useMemo(() => {
+    return achievements.filter((a) => {
+      const aDate = a.period?.start || a.created_at || '';
+      return isDateInPeriod(aDate);
+    });
+  }, [achievements, isDateInPeriod]);
+
   // Overall totals for report header
   const reportTotals = useMemo(() => {
     let totalBudget = 0;
@@ -353,6 +360,29 @@ export const ReportsView: React.FC = () => {
     window.print();
   };
 
+  // 인쇄/PDF 항목 선택 (체크 해제한 항목은 아예 렌더링에서 빠져서 인쇄 시 빈 여백이 남지 않음)
+  const BUDGET_SECTIONS = [
+    { key: 'budget-1', label: '1. 총괄 사업비 예산 및 집행 현황' },
+    { key: 'budget-2', label: '2. 월별 및 누적 사업비 집행 현황' },
+    { key: 'budget-3', label: '3. 영역별 예산 및 집행 현황' },
+    { key: 'budget-4', label: '4. 비목별 예산 및 집행 현황' },
+    { key: 'budget-5', label: '5. 세부과제별 예산 및 주요추진항목 현황' },
+    { key: 'budget-6', label: '6. 대학혁신지원사업 지출부' },
+  ];
+  const PERF_SECTIONS = [
+    { key: 'perf-1', label: '1. 5대 자율성과지표(KPI) 종합 달성 현황' },
+    { key: 'perf-2', label: '2. 세부프로그램 총괄 운영 및 성과 요약' },
+    { key: 'perf-3', label: '3. 월별 및 누적 프로그램 운영·참여 실적' },
+    { key: 'perf-4', label: '4. 세부프로그램별 실적 및 성과 상세 내역' },
+    { key: 'perf-5', label: '5. 프로그램 외 성과 실적' },
+  ];
+  const [enabledSections, setEnabledSections] = useState<Record<string, boolean>>({});
+  const isSectionOn = (key: string) => enabledSections[key] !== false;
+  const toggleSection = (key: string) => {
+    setEnabledSections((prev) => ({ ...prev, [key]: !isSectionOn(key) }));
+  };
+  const currentSectionList = reportType === 'budget' ? BUDGET_SECTIONS : PERF_SECTIONS;
+
   return (
     <div className="space-y-6">
       {/* 1. Header & Controls (Hidden during print) */}
@@ -376,6 +406,56 @@ export const ReportsView: React.FC = () => {
           <Printer className="h-4 w-4" />
           <span>보고서 인쇄 / PDF 저장</span>
         </button>
+      </div>
+
+      {/* 1-B. 인쇄 항목 선택 (체크 해제한 항목은 인쇄물에서 완전히 빠져서 빈 여백이 남지 않습니다) */}
+      <div className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-2xs print:hidden">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-xs font-bold text-slate-700">인쇄에 포함할 항목 선택</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() =>
+                setEnabledSections((prev) => {
+                  const next = { ...prev };
+                  currentSectionList.forEach((s) => (next[s.key] = true));
+                  return next;
+                })
+              }
+              className="text-[11px] font-semibold text-indigo-600 hover:underline"
+            >
+              전체 선택
+            </button>
+            <span className="text-slate-300">|</span>
+            <button
+              onClick={() =>
+                setEnabledSections((prev) => {
+                  const next = { ...prev };
+                  currentSectionList.forEach((s) => (next[s.key] = false));
+                  return next;
+                })
+              }
+              className="text-[11px] font-semibold text-slate-500 hover:underline"
+            >
+              전체 해제
+            </button>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+          {currentSectionList.map((s) => (
+            <label
+              key={s.key}
+              className="flex items-center gap-1.5 text-xs text-slate-700 cursor-pointer select-none"
+            >
+              <input
+                type="checkbox"
+                checked={isSectionOn(s.key)}
+                onChange={() => toggleSection(s.key)}
+                className="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+              />
+              {s.label}
+            </label>
+          ))}
+        </div>
       </div>
 
       {/* 2. Mode Selector & Domain / Period Filter (Hidden during print) */}
@@ -566,6 +646,7 @@ export const ReportsView: React.FC = () => {
         {reportType === 'budget' && (
           <div className="space-y-8">
             {/* 1) Overall Executive Summary Table */}
+            {isSectionOn('budget-1') && (
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
@@ -602,8 +683,10 @@ export const ReportsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* 2) Monthly & Cumulative Execution Report (전문대학: 3월 ~ 익년 2월) */}
+            {isSectionOn('budget-2') && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
@@ -687,8 +770,10 @@ export const ReportsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* 3) 영역별 집행 현황 (신규) */}
+            {isSectionOn('budget-3') && (
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
@@ -727,8 +812,10 @@ export const ReportsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* 4) 7 Expense Categories Breakdown (배정예산 오류 완전 수정) */}
+            {isSectionOn('budget-4') && (
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
@@ -780,9 +867,10 @@ export const ReportsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* 4) 세부과제별 7비목 × 3재원 예산 및 주요추진항목 현황 */}
-            <div>
+            <div className={isSectionOn('budget-5') ? '' : 'hidden'}>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
                 5. 세부과제별 7비목 × 3재원 예산 및 주요추진항목 현황
@@ -913,6 +1001,7 @@ export const ReportsView: React.FC = () => {
             </div>
 
             {/* 5) Detailed Expenditure Register (지출부 출력 양식) */}
+            {isSectionOn('budget-6') && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
@@ -1002,6 +1091,7 @@ export const ReportsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
           </div>
         )}
 
@@ -1010,80 +1100,127 @@ export const ReportsView: React.FC = () => {
         {/* ========================================================= */}
         {reportType === 'performance' && (
           <div className="space-y-8">
-            {/* 1) 5대 자율성과지표(KPI) 종합 달성 현황 — 성과지표/세부지표/세부측정지표까지 표시 */}
+            {/* 1) 5대 자율성과지표(KPI) 종합 달성 현황 — 보고서 형태로 깔끔하게 정리 */}
+            {isSectionOn('perf-1') && (
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
                 1. 대학혁신 5대 자율성과지표(KPI) 종합 달성 현황
               </h3>
-              <table className="w-full text-[11px] text-left border-collapse border border-slate-300">
-                <thead className="bg-slate-100 font-bold text-slate-800 text-center">
+
+              {/* 지표 → 세부지표 → 측정지표 → 세부측정지표 4단계를 엑셀 대장처럼 숫자 위주로 정리.
+                  목표값 칸은 있는 값(세부지표는 목표값, 없으면 권장값)을 그대로 보여주고, 달성도는 최상위 지표에만 표시 */}
+              <table className="w-full text-[11px] text-left border-collapse border border-slate-400 table-fixed">
+                <colgroup>
+                  <col style={{ width: '42%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '16%' }} />
+                </colgroup>
+                <thead className="bg-slate-200 font-bold text-slate-800 text-center">
                   <tr>
-                    <th className="border border-slate-300 p-2">자율성과지표 (KPI)</th>
-                    <th className="border border-slate-300 p-2 w-20">기준값</th>
-                    <th className="border border-slate-300 p-2 w-20">목표값</th>
-                    <th className="border border-slate-300 p-2 w-24">가중합 실적값</th>
-                    <th className="border border-slate-300 p-2 w-24">달성도 (%)</th>
-                    <th className="border border-slate-300 p-2 text-left min-w-[320px]">
-                      세부지표 → 측정지표 → 세부측정지표 실적 내역
-                    </th>
+                    <th className="border border-slate-400 p-1.5 text-left">지표 체계</th>
+                    <th className="border border-slate-400 p-1.5">기준값</th>
+                    <th className="border border-slate-400 p-1.5">목표값</th>
+                    <th className="border border-slate-400 p-1.5">실적값</th>
+                    <th className="border border-slate-400 p-1.5">달성도</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {kpis.map((kpi, idx) => {
-                    const achRate = (kpi.achievement * 100).toFixed(1);
+                  {kpis.map((kpi, kIdx) => {
+                    const achRate = kpi.achievement * 100;
                     return (
-                      <tr key={kpi.id}>
-                        <td className="border border-slate-300 p-2 font-bold text-slate-900 align-top">
-                          {idx + 1}. {kpi.name}
-                        </td>
-                        <td className="border border-slate-300 p-2 text-center align-top">{kpi.baseline}</td>
-                        <td className="border border-slate-300 p-2 text-center font-semibold align-top">
-                          {kpi.target}
-                        </td>
-                        <td className="border border-slate-300 p-2 text-center font-bold text-indigo-900 align-top">
-                          {kpi.actual}
-                        </td>
-                        <td className="border border-slate-300 p-2 text-center font-extrabold text-emerald-800 align-top">
-                          {achRate}%
-                        </td>
-                        <td className="border border-slate-300 p-2 text-[10px] space-y-1.5 align-top">
-                          {kpi.details.map((d, dIdx) => (
-                            <div key={d.id}>
-                              <div className="font-bold text-slate-800">
-                                • {dIdx + 1}) {d.name} (가중치 {((kpi.weights?.[dIdx] || 0) * 100).toFixed(0)}%): 실적{' '}
-                                <strong>{d.actual}</strong> / 기준 {d.baseline}
-                              </div>
-                              {d.measures.map((m, mIdx) => (
-                                <div key={m.id} className="pl-3 text-slate-700">
-                                  <div>
-                                    - {dIdx + 1}.{mIdx + 1}) {m.name}: 실적 <strong>{m.actual}</strong> / 기준{' '}
+                      <React.Fragment key={kpi.id}>
+                        {/* Level 0: 자율성과지표 */}
+                        <tr className="bg-slate-100 font-bold">
+                          <td className="border border-slate-400 p-1.5 text-slate-900">
+                            {kIdx + 1}. {kpi.name}
+                          </td>
+                          <td className="border border-slate-400 p-1.5 text-center font-mono">{kpi.baseline}</td>
+                          <td className="border border-slate-400 p-1.5 text-center font-mono">{kpi.target}</td>
+                          <td className="border border-slate-400 p-1.5 text-center font-mono">{kpi.actual}</td>
+                          <td className="border border-slate-400 p-1.5 text-center font-mono text-emerald-800">
+                            {achRate.toFixed(1)}%
+                          </td>
+                        </tr>
+
+                        {/* Level 1: 세부지표 */}
+                        {kpi.details.map((d, dIdx) => {
+                          const detailTarget = d.target ?? d.recommended_value ?? null;
+                          return (
+                          <React.Fragment key={d.id}>
+                            <tr className="bg-white">
+                              <td className="border border-slate-400 py-1 pr-2 pl-6 font-semibold text-slate-800">
+                                {kIdx + 1}-{dIdx + 1}. {d.name}
+                              </td>
+                              <td className="border border-slate-400 p-1 text-center font-mono text-slate-600">
+                                {d.baseline}
+                              </td>
+                              <td className="border border-slate-400 p-1 text-center font-mono text-slate-600">
+                                {detailTarget ?? '-'}
+                              </td>
+                              <td className="border border-slate-400 p-1 text-center font-mono font-semibold text-slate-800">
+                                {d.actual}
+                              </td>
+                              <td className="border border-slate-400 p-1 text-center text-slate-300">-</td>
+                            </tr>
+
+                            {/* Level 2: 측정지표 */}
+                            {d.measures.map((m, mIdx) => (
+                              <React.Fragment key={m.id}>
+                                <tr className="bg-slate-50">
+                                  <td className="border border-slate-400 py-1 pr-2 pl-10 text-slate-700">
+                                    {kIdx + 1}-{dIdx + 1}-{mIdx + 1}) {m.name}
+                                  </td>
+                                  <td className="border border-slate-400 p-1 text-center font-mono text-slate-500">
                                     {m.baseline}
-                                  </div>
-                                  {m.sub_measures.map((sm) => (
-                                    <div key={sm.id} className="pl-3 text-slate-500">
-                                      · {sm.name}: 실적{' '}
-                                      <strong className="text-indigo-800">
-                                        {sm.actual === null || sm.actual === undefined ? '-' : sm.actual}
-                                      </strong>
-                                      {sm.recommended_value != null && <> (권장 {sm.recommended_value})</>}
-                                      {sm.department && <> · {sm.department}</>}
-                                      {sm.check_result && <> · 점검 {sm.check_result}</>}
-                                    </div>
-                                  ))}
-                                </div>
-                              ))}
-                            </div>
-                          ))}
-                        </td>
-                      </tr>
+                                  </td>
+                                  <td className="border border-slate-400 p-1 text-center text-slate-300">-</td>
+                                  <td className="border border-slate-400 p-1 text-center font-mono text-slate-700">
+                                    {m.actual}
+                                  </td>
+                                  <td className="border border-slate-400 p-1 text-center text-slate-300">-</td>
+                                </tr>
+
+                                {/* Level 3: 세부측정지표 */}
+                                {m.sub_measures.map((sm) => (
+                                  <tr key={sm.id} className="bg-white">
+                                    <td className="border border-slate-400 py-1 pr-2 pl-14 text-[10px] text-slate-600">
+                                      · {sm.name}
+                                    </td>
+                                    <td className="border border-slate-400 p-1 text-center font-mono text-[10px] text-slate-400">
+                                      {sm.baseline ?? '-'}
+                                    </td>
+                                    <td className="border border-slate-400 p-1 text-center font-mono text-[10px] text-slate-400">
+                                      {sm.recommended_value ?? '-'}
+                                    </td>
+                                    <td className="border border-slate-400 p-1 text-center font-mono text-[10px] font-semibold text-slate-700">
+                                      {sm.actual ?? '-'}
+                                    </td>
+                                    <td className="border border-slate-400 p-1 text-center text-slate-300">-</td>
+                                  </tr>
+                                ))}
+                              </React.Fragment>
+                            ))}
+                          </React.Fragment>
+                          );
+                        })}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
               </table>
+              <p className="text-[10px] text-slate-400 mt-1.5">
+                ※ 목표값은 세부지표까지만 존재합니다(측정지표·세부측정지표는 성과지표 관리대장 원본에 목표값 항목이
+                없음). 세부지표에 목표값이 없는 경우 참고용 권장값을 대신 표시했습니다. 달성도는 목표 대비 실적
+                개념이 있는 최상위 자율성과지표에만 표시됩니다.
+              </p>
             </div>
+            )}
 
             {/* 2) Overall Performance Summary */}
+            {isSectionOn('perf-2') && (
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
@@ -1144,8 +1281,10 @@ export const ReportsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* 2) Monthly & Cumulative Performance Table (3월 ~ 익년 2월) */}
+            {isSectionOn('perf-3') && (
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
@@ -1194,8 +1333,10 @@ export const ReportsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* 3) Programs Performance List */}
+            {isSectionOn('perf-4') && (
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
@@ -1284,8 +1425,70 @@ export const ReportsView: React.FC = () => {
                 </tbody>
               </table>
             </div>
+            )}
 
             {/* 4) 5대 자율성과지표(KPI) 종합 달성 현황은 1번 섹션으로 이동됨 */}
+
+            {/* 5) 프로그램 외 성과 실적 (위원회 운영 · 규정정비 · 구성원참여 · 성과확산 · 업무협약) */}
+            {filteredAchievements.length > 0 && isSectionOn('perf-5') && (
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
+                  5. 프로그램 외 성과 실적 (위원회 운영 · 규정정비 · 구성원참여 · 성과확산 · 업무협약)
+                </h3>
+                <div className="space-y-2.5">
+                  {ACHIEVEMENT_CATEGORIES.map((cat) => {
+                    const catItems = filteredAchievements.filter((a) => a.category === cat);
+                    if (catItems.length === 0) return null;
+
+                    const bySub = new Map<string, typeof catItems>();
+                    catItems.forEach((a) => {
+                      if (!bySub.has(a.subcategory)) bySub.set(a.subcategory, []);
+                      bySub.get(a.subcategory)!.push(a);
+                    });
+
+                    // 카테고리 전체 합계: metric_value가 있는 항목은 값을 더하고, 없는 항목은 1건으로 집계
+                    const catTotal = catItems.reduce((sum, a) => sum + (a.metric_value ?? 1), 0);
+                    const catUnit = catItems.find((a) => a.metric_unit)?.metric_unit || '건';
+
+                    return (
+                      <div key={cat} className="rounded-lg border border-slate-200 p-3">
+                        <div className="text-xs font-bold text-slate-900 mb-1.5">
+                          {cat} 실적 {catTotal}{catUnit}
+                        </div>
+                        <div className="space-y-2">
+                          {Array.from(bySub.entries()).map(([sub, items]) => {
+                            const subTotal = items.reduce((sum, a) => sum + (a.metric_value ?? 1), 0);
+                            const subUnit = items.find((a) => a.metric_unit)?.metric_unit || '건';
+                            return (
+                              <div key={sub} className="text-[11px]">
+                                <div className="font-semibold text-slate-800">
+                                  · {sub} {subTotal}{subUnit}
+                                </div>
+                                <ul className="mt-0.5 pl-4 space-y-0.5">
+                                  {items.map((it) => {
+                                    const meta = [];
+                                    if (it.internal_approval_doc_number) meta.push(it.internal_approval_doc_number);
+                                    if (it.metric_value != null) meta.push(`${it.metric_value}${it.metric_unit || ''}`);
+                                    meta.push(it.period?.start || '일자 미정');
+                                    return (
+                                      <li key={it.id} className="text-slate-700">
+                                        {it.content}{' '}
+                                        <span className="text-slate-400">({meta.join(', ')})</span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              )}
           </div>
         )}
       </div>

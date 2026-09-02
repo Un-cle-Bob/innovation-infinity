@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import {
+  Achievement,
   ApprovalRequest,
   AppTabId,
   CorporateCard,
@@ -54,6 +55,7 @@ interface AppContextType {
   tasks: { [code: string]: Task };
   executions: Execution[];
   programs: Program[];
+  achievements: Achievement[];
   kpis: KpiIndicator[];
   approvalRequests: ApprovalRequest[];
   pendingApprovalCount: number;
@@ -101,6 +103,9 @@ interface AppContextType {
   addProgram: (program: Omit<Program, 'id' | 'updated_at'>) => void;
   updateProgram: (id: string, updates: Partial<Program>) => void;
   deleteProgram: (id: string) => void;
+  addAchievement: (data: Omit<Achievement, 'id' | 'created_at' | 'updated_at'>) => void;
+  updateAchievement: (id: string, updates: Partial<Achievement>) => void;
+  deleteAchievement: (id: string) => void;
 
   // KPI Actions (8절)
   updateKpiSubMeasure: (
@@ -115,9 +120,10 @@ interface AppContextType {
   ) => void;
   updateKpiWeights: (
     kpiId: string,
-    targetType: 'indicator' | 'detail',
+    targetType: 'indicator' | 'detail' | 'measure',
     detailId: string | null,
-    weights: number[]
+    weights: number[],
+    measureId?: string | null
   ) => void;
   applyKpiRecommendation: (
     kpiId: string,
@@ -132,6 +138,24 @@ interface AppContextType {
     measureId: string,
     subMeasureId: string,
     recommendedValue: number | null
+  ) => void;
+  updateKpiDetailInfo: (
+    kpiId: string,
+    detailId: string,
+    updates: { name?: string; target?: number | null; recommended_value?: number | null }
+  ) => void;
+  updateKpiMeasureInfo: (
+    kpiId: string,
+    detailId: string,
+    measureId: string,
+    updates: { name?: string }
+  ) => void;
+  updateKpiSubMeasureInfo: (
+    kpiId: string,
+    detailId: string,
+    measureId: string,
+    subMeasureId: string,
+    updates: { name?: string; department?: string; detail_note?: string }
   ) => void;
 
   // Settings Actions (9절)
@@ -864,6 +888,45 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('세부프로그램이 삭제되었습니다.', 'success');
   };
 
+  // 성과 실적 관리 (7절 확장): 프로그램 외의 위원회 운영, 규정 정비, 구성원 참여, 성과확산, 협약체결 등
+  const addAchievement = (data: Omit<Achievement, 'id' | 'created_at' | 'updated_at'>) => {
+    const id = `ach-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+    const newAchievement: Achievement = {
+      ...data,
+      id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    mutateYearData((prev) => ({
+      ...prev,
+      achievements: { ...prev.achievements, [id]: newAchievement },
+    }));
+    showToast('성과 실적이 등록되었습니다.', 'success');
+  };
+
+  const updateAchievement = (id: string, updates: Partial<Achievement>) => {
+    mutateYearData((prev) => {
+      const orig = prev.achievements[id];
+      if (!orig) return prev;
+      return {
+        ...prev,
+        achievements: {
+          ...prev.achievements,
+          [id]: { ...orig, ...updates, updated_at: new Date().toISOString() },
+        },
+      };
+    });
+  };
+
+  const deleteAchievement = (id: string) => {
+    mutateYearData((prev) => {
+      const next = { ...prev.achievements };
+      delete next[id];
+      return { ...prev, achievements: next };
+    });
+    showToast('성과 실적이 삭제되었습니다.', 'success');
+  };
+
   // KPI Mutations (8절)
   const updateKpiSubMeasure = (
     kpiId: string,
@@ -946,9 +1009,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateKpiWeights = (
     kpiId: string,
-    targetType: 'indicator' | 'detail',
+    targetType: 'indicator' | 'detail' | 'measure',
     detailId: string | null,
-    weights: number[]
+    weights: number[],
+    measureId?: string | null
   ) => {
     mutateYearData((prev) => {
       const nextKpis = prev.kpis.map((kpi) => {
@@ -956,11 +1020,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (targetType === 'indicator') {
           return { ...kpi, weights };
         }
+        if (targetType === 'detail') {
+          return {
+            ...kpi,
+            details: kpi.details.map((det) => (det.id !== detailId ? det : { ...det, weights })),
+          };
+        }
+        // targetType === 'measure': 특정 세부지표 안의 특정 측정지표에 가중치 설정
         return {
           ...kpi,
           details: kpi.details.map((det) => {
             if (det.id !== detailId) return det;
-            return { ...det, weights };
+            return {
+              ...det,
+              measures: det.measures.map((mea) => (mea.id !== measureId ? mea : { ...mea, weights })),
+            };
           }),
         };
       });
@@ -968,6 +1042,83 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return { ...prev, kpis: recalculated };
     });
     showToast('KPI 가중치가 재설정되어 전체 지표가 재계산되었습니다.', 'success');
+  };
+
+  const updateKpiDetailInfo = (
+    kpiId: string,
+    detailId: string,
+    updates: { name?: string; target?: number | null; recommended_value?: number | null }
+  ) => {
+    mutateYearData((prev) => ({
+      ...prev,
+      kpis: prev.kpis.map((kpi) => {
+        if (kpi.id !== kpiId) return kpi;
+        return {
+          ...kpi,
+          details: kpi.details.map((det) => (det.id !== detailId ? det : { ...det, ...updates })),
+        };
+      }),
+    }));
+    showToast('세부지표 정보가 수정되었습니다.', 'success');
+  };
+
+  const updateKpiMeasureInfo = (
+    kpiId: string,
+    detailId: string,
+    measureId: string,
+    updates: { name?: string }
+  ) => {
+    mutateYearData((prev) => ({
+      ...prev,
+      kpis: prev.kpis.map((kpi) => {
+        if (kpi.id !== kpiId) return kpi;
+        return {
+          ...kpi,
+          details: kpi.details.map((det) => {
+            if (det.id !== detailId) return det;
+            return {
+              ...det,
+              measures: det.measures.map((mea) => (mea.id !== measureId ? mea : { ...mea, ...updates })),
+            };
+          }),
+        };
+      }),
+    }));
+    showToast('측정지표 정보가 수정되었습니다.', 'success');
+  };
+
+  const updateKpiSubMeasureInfo = (
+    kpiId: string,
+    detailId: string,
+    measureId: string,
+    subMeasureId: string,
+    updates: { name?: string; department?: string; detail_note?: string }
+  ) => {
+    mutateYearData((prev) => ({
+      ...prev,
+      kpis: prev.kpis.map((kpi) => {
+        if (kpi.id !== kpiId) return kpi;
+        return {
+          ...kpi,
+          details: kpi.details.map((det) => {
+            if (det.id !== detailId) return det;
+            return {
+              ...det,
+              measures: det.measures.map((mea) => {
+                if (mea.id !== measureId) return mea;
+                return {
+                  ...mea,
+                  sub_measures: mea.sub_measures.map((sm) =>
+                    sm.id !== subMeasureId ? sm : { ...sm, ...updates }
+                  ),
+                };
+              }),
+            };
+          }),
+        };
+      }),
+    }));
+    showToast('세부측정지표 정보가 수정되었습니다.', 'success');
   };
 
   const applyKpiRecommendation = (
@@ -1039,6 +1190,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const executionsList = Object.values(yearData.executions) as Execution[];
   const programsList = Object.values(yearData.programs) as Program[];
+  const achievementsList = Object.values(yearData.achievements || {}) as Achievement[];
   const approvalRequestsList = Object.values(yearData.approval_requests) as ApprovalRequest[];
   const pendingApprovalCount = approvalRequestsList.filter((r) => r.status === 'pending').length;
 
@@ -1060,6 +1212,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         tasks: yearData.tasks,
         executions: executionsList,
         programs: programsList,
+        achievements: achievementsList,
         kpis: yearData.kpis,
         approvalRequests: approvalRequestsList,
         pendingApprovalCount,
@@ -1083,10 +1236,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addProgram,
         updateProgram,
         deleteProgram,
+        addAchievement,
+        updateAchievement,
+        deleteAchievement,
         updateKpiSubMeasure,
         updateKpiWeights,
         applyKpiRecommendation,
         updateKpiSubMeasureRecommendedValue,
+        updateKpiDetailInfo,
+        updateKpiMeasureInfo,
+        updateKpiSubMeasureInfo,
         addDepartment,
         updateDepartment,
         deleteDepartment,

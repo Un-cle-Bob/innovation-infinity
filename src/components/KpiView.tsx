@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertCircle,
   HelpCircle,
+  Pencil,
 } from 'lucide-react';
 
 export const KpiView: React.FC = () => {
@@ -28,6 +29,9 @@ export const KpiView: React.FC = () => {
     updateKpiSubMeasure,
     updateKpiWeights,
     updateKpiSubMeasureRecommendedValue,
+    updateKpiDetailInfo,
+    updateKpiMeasureInfo,
+    updateKpiSubMeasureInfo,
     canEditTab,
   } = useApp();
 
@@ -40,8 +44,22 @@ export const KpiView: React.FC = () => {
     'det-2026-1-1': true,
   });
 
-  // Weights Modal State
-  const [weightsModalKpi, setWeightsModalKpi] = useState<KpiIndicator | null>(null);
+  // 측정지표/세부측정지표 명칭·내역 인라인 수정 상태
+  const [editingMeasureId, setEditingMeasureId] = useState<string | null>(null);
+  const [editMeasureName, setEditMeasureName] = useState('');
+  const [editingSubMeasureId, setEditingSubMeasureId] = useState<string | null>(null);
+  const [editSubName, setEditSubName] = useState('');
+  const [editSubNote, setEditSubNote] = useState('');
+
+  // Weights Modal State (자율성과지표 / 세부지표 / 측정지표 3단계 공용)
+  const [weightsModalCtx, setWeightsModalCtx] = useState<null | {
+    kpi: KpiIndicator;
+    type: 'indicator' | 'detail' | 'measure';
+    detail?: KpiDetail;
+    measure?: Measure;
+    title: string;
+    labels: string[];
+  }>(null);
   const [editingWeights, setEditingWeights] = useState<number[]>([]);
 
   const toggleIndicator = (id: string) => {
@@ -52,21 +70,65 @@ export const KpiView: React.FC = () => {
     setExpandedDetails((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const openWeightsModal = (kpi: KpiIndicator) => {
-    setWeightsModalKpi(kpi);
-    setEditingWeights([...(kpi.weights || [])]);
+  // 해당 자율성과지표 하위의 모든 세부지표를 한 번에 펼치기/접기
+  const expandAllUnderIndicator = (kpi: KpiIndicator, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const allDetailIds = kpi.details.map((d) => d.id);
+    const allOpen = allDetailIds.every((id) => expandedDetails[id]);
+    setExpandedIndicators((prev) => ({ ...prev, [kpi.id]: true }));
+    setExpandedDetails((prev) => {
+      const next = { ...prev };
+      allDetailIds.forEach((id) => {
+        next[id] = !allOpen;
+      });
+      return next;
+    });
+  };
+
+  const openWeightsModal = (
+    kpi: KpiIndicator,
+    type: 'indicator' | 'detail' | 'measure',
+    detail?: KpiDetail,
+    measure?: Measure
+  ) => {
+    let current: number[] = [];
+    let labels: string[] = [];
+    let title = '';
+    if (type === 'indicator') {
+      current = kpi.weights || [];
+      labels = kpi.details.map((d) => d.name);
+      title = `${kpi.name} — 세부지표 가중치 설정`;
+    } else if (type === 'detail' && detail) {
+      current = detail.weights || [];
+      labels = detail.measures.map((m) => m.name);
+      title = `${detail.name} — 측정지표 가중치 설정`;
+    } else if (type === 'measure' && measure) {
+      current = measure.weights || [];
+      labels = measure.sub_measures.map((s) => s.name);
+      title = `${measure.name} — 세부측정지표 가중치 설정`;
+    }
+    // 내부 저장은 0~1 소수, 편집 화면에서는 %(0~100)로 보여줌
+    const initial =
+      current.length === labels.length
+        ? current.map((w) => Math.round(w * 10000) / 100)
+        : labels.map(() => Math.round((100 / labels.length) * 100) / 100);
+    setWeightsModalCtx({ kpi, type, detail, measure, title, labels });
+    setEditingWeights(initial);
   };
 
   const saveWeights = () => {
-    if (!weightsModalKpi) return;
+    if (!weightsModalCtx) return;
     const sum = editingWeights.reduce((a, b) => a + b, 0);
-    if (sum !== 100 && sum !== 1.0) {
-      if (!confirm(`가중치 합계가 ${sum}입니다 (일반적으로 100 또는 1.0 권장). 계속 저장하시겠습니까?`)) {
+    if (Math.round(sum) !== 100) {
+      if (!confirm(`가중치 합계가 ${sum}%입니다 (보통 100%를 권장). 계속 저장하시겠습니까?`)) {
         return;
       }
     }
-    updateKpiWeights(weightsModalKpi.id, 'indicator', null, editingWeights);
-    setWeightsModalKpi(null);
+    const { kpi, type, detail, measure } = weightsModalCtx;
+    // %(0~100) → 소수(0~1)로 변환해서 저장 (엔진은 합계 기준 자동 정규화도 해줌)
+    const fractionWeights = editingWeights.map((w) => w / 100);
+    updateKpiWeights(kpi.id, type, detail?.id ?? null, fractionWeights, measure?.id ?? null);
+    setWeightsModalCtx(null);
   };
 
   const getCheckResultBadge = (res: 'O' | '-' | 'X') => {
@@ -187,16 +249,16 @@ export const KpiView: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-4 text-xs">
-                  <div className="text-right">
+                  <div className="w-32 text-right shrink-0">
                     <span className="block text-[10px] text-slate-400">기준값 / 목표값</span>
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-200 font-mono tabular-nums block truncate" title={`${kpi.baseline} / ${kpi.target}`}>
                       {kpi.baseline} / {kpi.target}
                     </span>
                   </div>
 
-                  <div className="text-right">
+                  <div className="w-32 text-right shrink-0">
                     <span className="block text-[10px] text-slate-400">가중합 실적 (달성도)</span>
-                    <span className="font-bold text-emerald-400">
+                    <span className="font-bold text-emerald-400 font-mono tabular-nums block truncate" title={`${kpi.actual} (${achPercent}%)`}>
                       {kpi.actual} ({achPercent}%)
                     </span>
                   </div>
@@ -205,7 +267,7 @@ export const KpiView: React.FC = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        openWeightsModal(kpi);
+                        openWeightsModal(kpi, 'indicator');
                       }}
                       className="flex items-center gap-1 rounded-lg bg-slate-800 border border-slate-700 px-2.5 py-1 text-xs font-semibold text-slate-300 hover:bg-indigo-600 hover:text-white transition-colors"
                       title="세부지표별 가중치(weights) 설정"
@@ -214,6 +276,24 @@ export const KpiView: React.FC = () => {
                       <span>가중치 설정</span>
                     </button>
                   )}
+
+                  <button
+                    onClick={(e) => expandAllUnderIndicator(kpi, e)}
+                    className="flex items-center gap-1 rounded-lg bg-indigo-600 border border-indigo-500 px-2.5 py-1 text-xs font-semibold text-white hover:bg-indigo-500 transition-colors"
+                    title="이 지표 산하 세부지표를 한 번에 모두 펼치기/접기"
+                  >
+                    {kpi.details.every((d) => expandedDetails[d.id]) ? (
+                      <>
+                        <ChevronRight className="h-3.5 w-3.5" />
+                        <span>전체 접기</span>
+                      </>
+                    ) : (
+                      <>
+                        <ChevronDown className="h-3.5 w-3.5" />
+                        <span>전체 펼치기</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
 
@@ -250,17 +330,62 @@ export const KpiView: React.FC = () => {
                             </h4>
                           </div>
 
-                          {/* 규격화된 가중치 / 기준 / 실적 고정 그리드 프레임 (텍스트 길이에 무관하게 동일한 틀) */}
-                          <div className="grid grid-cols-3 gap-2 w-72 sm:w-80 shrink-0 text-center select-none">
-                            <div className="rounded-lg bg-indigo-50 border border-indigo-200 py-1 px-2">
+                          {/* 규격화된 가중치 / 기준 / 목표 / 권장 / 실적 고정 그리드 프레임 (텍스트 길이에 무관하게 동일한 틀) */}
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="grid grid-cols-5 gap-1.5 w-full max-w-xl sm:w-[30rem] shrink-0 text-center select-none"
+                          >
+                            <div className="rounded-lg bg-indigo-50 border border-indigo-200 py-1 px-1.5">
                               <span className="text-[10px] font-medium text-indigo-600 block leading-tight">가중치</span>
                               <span className="text-xs font-extrabold text-indigo-900 leading-tight">{weightVal}%</span>
                             </div>
-                            <div className="rounded-lg bg-slate-50 border border-slate-200 py-1 px-2">
+                            <div className="rounded-lg bg-slate-50 border border-slate-200 py-1 px-1.5">
                               <span className="text-[10px] font-medium text-slate-500 block leading-tight">기준값</span>
                               <span className="text-xs font-bold text-slate-800 leading-tight">{detail.baseline}</span>
                             </div>
-                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 py-1 px-2">
+                            <div className="rounded-lg bg-blue-50 border border-blue-200 py-1 px-1.5">
+                              <span className="text-[10px] font-medium text-blue-600 block leading-tight">목표값</span>
+                              {canEdit ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={detail.target ?? ''}
+                                  onChange={(e) =>
+                                    updateKpiDetailInfo(kpi.id, detail.id, {
+                                      target: e.target.value === '' ? null : Number(e.target.value),
+                                    })
+                                  }
+                                  placeholder="-"
+                                  className="w-full bg-transparent text-xs font-bold text-blue-900 leading-tight text-center focus:outline-hidden"
+                                />
+                              ) : (
+                                <span className="text-xs font-bold text-blue-900 leading-tight">
+                                  {detail.target ?? '-'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="rounded-lg bg-amber-50 border border-amber-200 py-1 px-1.5">
+                              <span className="text-[10px] font-medium text-amber-700 block leading-tight">권장값</span>
+                              {canEdit ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={detail.recommended_value ?? ''}
+                                  onChange={(e) =>
+                                    updateKpiDetailInfo(kpi.id, detail.id, {
+                                      recommended_value: e.target.value === '' ? null : Number(e.target.value),
+                                    })
+                                  }
+                                  placeholder="-"
+                                  className="w-full bg-transparent text-xs font-bold text-amber-900 leading-tight text-center focus:outline-hidden"
+                                />
+                              ) : (
+                                <span className="text-xs font-bold text-amber-900 leading-tight">
+                                  {detail.recommended_value ?? '-'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="rounded-lg bg-emerald-50 border border-emerald-200 py-1 px-1.5">
                               <span className="text-[10px] font-medium text-emerald-700 block leading-tight">가중합 실적</span>
                               <span className="text-xs font-extrabold text-emerald-800 leading-tight">{detail.actual}</span>
                             </div>
@@ -270,21 +395,82 @@ export const KpiView: React.FC = () => {
                         {/* 측정지표 & 세부측정지표 Table */}
                         {isDetailExpanded && (
                           <div className="p-3 bg-white space-y-3">
-                            {detail.measures.map((measure, mIdx) => (
+                            {detail.measures.map((measure, mIdx) => {
+                              const isEditingMeasureName = editingMeasureId === measure.id;
+                              return (
                               <div
                                 key={measure.id}
                                 className="rounded-lg border border-slate-100 bg-slate-50/40 p-3 space-y-2"
                               >
                                 {/* 측정지표 Title */}
-                                <div className="flex items-center justify-between text-xs border-b border-slate-200 pb-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="rounded-xs bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-800 font-mono">
+                                <div className="flex items-center justify-between gap-3 text-xs border-b border-slate-200 pb-1.5">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <span className="rounded-xs bg-slate-200 px-1.5 py-0.5 text-[11px] font-bold text-slate-800 font-mono shrink-0">
                                       측정지표 {kIdx + 1}.{dIdx + 1}.{mIdx + 1}
                                     </span>
-                                    <span className="font-bold text-slate-800">{measure.name}</span>
+                                    {isEditingMeasureName ? (
+                                      <div className="flex items-center gap-1 flex-1 min-w-0">
+                                        <input
+                                          type="text"
+                                          value={editMeasureName}
+                                          onChange={(e) => setEditMeasureName(e.target.value)}
+                                          autoFocus
+                                          className="flex-1 min-w-0 rounded-md border border-indigo-300 px-1.5 py-0.5 text-xs font-bold"
+                                        />
+                                        <button
+                                          onClick={() => {
+                                            updateKpiMeasureInfo(kpi.id, detail.id, measure.id, {
+                                              name: editMeasureName.trim() || measure.name,
+                                            });
+                                            setEditingMeasureId(null);
+                                          }}
+                                          className="shrink-0 rounded bg-emerald-600 p-0.5 text-white"
+                                        >
+                                          <Check className="h-3 w-3" />
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingMeasureId(null)}
+                                          className="shrink-0 rounded bg-slate-200 p-0.5 text-slate-600"
+                                        >
+                                          <X className="h-3 w-3" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <span className="font-bold text-slate-800 truncate">{measure.name}</span>
+                                    )}
+                                    {canEdit && !isEditingMeasureName && (
+                                      <button
+                                        onClick={() => {
+                                          setEditingMeasureId(measure.id);
+                                          setEditMeasureName(measure.name);
+                                        }}
+                                        className="shrink-0 text-slate-300 hover:text-indigo-600"
+                                        title="측정지표명 수정"
+                                      >
+                                        <Pencil className="h-3 w-3" />
+                                      </button>
+                                    )}
                                   </div>
-                                  <div className="text-xs text-slate-500">
-                                    측정 소계 실적: <strong className="text-indigo-900">{measure.actual}</strong>
+
+                                  {/* 측정지표 기준값/실적값 강조 표시 */}
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <div className="rounded-md bg-slate-100 border border-slate-200 px-2 py-1 text-center">
+                                      <span className="block text-[9px] font-medium text-slate-500 leading-tight">기준값</span>
+                                      <span className="text-xs font-bold text-slate-800 leading-tight">{measure.baseline}</span>
+                                    </div>
+                                    <div className="rounded-md bg-indigo-100 border border-indigo-300 px-2 py-1 text-center">
+                                      <span className="block text-[9px] font-bold text-indigo-600 leading-tight">실적값</span>
+                                      <span className="text-xs font-extrabold text-indigo-900 leading-tight">{measure.actual}</span>
+                                    </div>
+                                    {canEdit && (
+                                      <button
+                                        onClick={() => openWeightsModal(kpi, 'measure', detail, measure)}
+                                        className="rounded-md bg-slate-800 border border-slate-700 p-1.5 text-slate-300 hover:bg-indigo-600 hover:text-white transition-colors"
+                                        title="세부측정지표 가중치 설정"
+                                      >
+                                        <Sliders className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
 
@@ -294,7 +480,7 @@ export const KpiView: React.FC = () => {
                                     <thead>
                                       <tr className="bg-slate-100 text-slate-600 font-semibold border-b border-slate-200">
                                         <th className="py-2 px-3 min-w-[200px]">
-                                          세부측정내역
+                                          세부측정지표
                                         </th>
                                         <th className="py-2 px-3 text-right w-20">기준값</th>
                                         <th className="py-2 px-3 text-center w-20">
@@ -313,15 +499,72 @@ export const KpiView: React.FC = () => {
                                           sub.recommended_value !== undefined &&
                                           sub.recommended_value !== null &&
                                           (sub.actual || 0) >= sub.recommended_value;
+                                        const isEditingSub = editingSubMeasureId === sub.id;
 
                                         return (
                                           <tr key={sub.id} className="hover:bg-slate-50/80">
-                                            {/* 세부측정내역 */}
+                                            {/* 세부측정지표 (명칭 + 내역, 수정 가능) */}
                                             <td className="py-2.5 px-3 font-medium text-slate-800">
-                                              <div>{sub.name}</div>
-                                              {sub.detail_note && (
-                                                <div className="text-[11px] font-normal text-slate-400 mt-0.5">
-                                                  {sub.detail_note}
+                                              {isEditingSub ? (
+                                                <div className="space-y-1">
+                                                  <input
+                                                    type="text"
+                                                    value={editSubName}
+                                                    onChange={(e) => setEditSubName(e.target.value)}
+                                                    className="w-full rounded-md border border-indigo-300 px-1.5 py-0.5 text-xs font-bold"
+                                                    autoFocus
+                                                  />
+                                                  <input
+                                                    type="text"
+                                                    value={editSubNote}
+                                                    onChange={(e) => setEditSubNote(e.target.value)}
+                                                    placeholder="내역 (선택)"
+                                                    className="w-full rounded-md border border-slate-300 px-1.5 py-0.5 text-[11px]"
+                                                  />
+                                                  <div className="flex items-center gap-1">
+                                                    <button
+                                                      onClick={() => {
+                                                        updateKpiSubMeasureInfo(kpi.id, detail.id, measure.id, sub.id, {
+                                                          name: editSubName.trim() || sub.name,
+                                                          detail_note: editSubNote.trim(),
+                                                        });
+                                                        setEditingSubMeasureId(null);
+                                                      }}
+                                                      className="rounded bg-emerald-600 p-0.5 text-white"
+                                                    >
+                                                      <Check className="h-3 w-3" />
+                                                    </button>
+                                                    <button
+                                                      onClick={() => setEditingSubMeasureId(null)}
+                                                      className="rounded bg-slate-200 p-0.5 text-slate-600"
+                                                    >
+                                                      <X className="h-3 w-3" />
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ) : (
+                                                <div className="flex items-start gap-1 group">
+                                                  <div className="flex-1 min-w-0">
+                                                    <div>{sub.name}</div>
+                                                    {sub.detail_note && (
+                                                      <div className="text-[11px] font-normal text-slate-400 mt-0.5">
+                                                        {sub.detail_note}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                  {canEdit && (
+                                                    <button
+                                                      onClick={() => {
+                                                        setEditingSubMeasureId(sub.id);
+                                                        setEditSubName(sub.name);
+                                                        setEditSubNote(sub.detail_note || '');
+                                                      }}
+                                                      className="shrink-0 text-slate-300 opacity-0 group-hover:opacity-100 hover:text-indigo-600 transition-opacity"
+                                                      title="명칭/내역 수정"
+                                                    >
+                                                      <Pencil className="h-3 w-3" />
+                                                    </button>
+                                                  )}
                                                 </div>
                                               )}
                                             </td>
@@ -390,11 +633,19 @@ export const KpiView: React.FC = () => {
                                               />
                                             </td>
 
-                                            {/* 담당부서 */}
+                                            {/* 담당부서 (자유 텍스트 - 콤마로 복수부서 입력 가능) */}
                                             <td className="py-2.5 px-3 text-slate-700">
-                                              <span className="rounded-xs bg-slate-100 px-1.5 py-0.5 text-[11px]">
-                                                {sub.department}
-                                              </span>
+                                              <input
+                                                type="text"
+                                                value={sub.department}
+                                                onChange={(e) =>
+                                                  updateKpiSubMeasureInfo(kpi.id, detail.id, measure.id, sub.id, {
+                                                    department: e.target.value,
+                                                  })
+                                                }
+                                                disabled={!canEdit}
+                                                className="w-full rounded-xs border border-transparent bg-slate-100 px-1.5 py-0.5 text-[11px] focus:border-indigo-300 focus:bg-white focus:outline-hidden disabled:opacity-70"
+                                              />
                                             </td>
 
                                             {/* 점검결과 (O / - / X 원클릭 변경) */}
@@ -479,7 +730,8 @@ export const KpiView: React.FC = () => {
                                   </table>
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         )}
                       </div>
@@ -492,21 +744,19 @@ export const KpiView: React.FC = () => {
         })}
       </div>
 
-      {/* 4. KPI Weights Configuration Modal */}
-      {weightsModalKpi && (
+      {/* 4. KPI Weights Configuration Modal (자율성과지표/세부지표/측정지표 3단계 공용) */}
+      {weightsModalCtx && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  {weightsModalKpi.name} — 세부지표 가중치(weights) 설정
-                </h3>
+                <h3 className="text-base font-bold text-slate-900">{weightsModalCtx.title}</h3>
                 <p className="text-xs text-slate-500">
-                  산하 {weightsModalKpi.details.length}개 세부지표의 반영 가중치를 설정합니다.
+                  산하 {weightsModalCtx.labels.length}개 항목의 반영 가중치를 설정합니다.
                 </p>
               </div>
               <button
-                onClick={() => setWeightsModalKpi(null)}
+                onClick={() => setWeightsModalCtx(null)}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X className="h-5 w-5" />
@@ -514,18 +764,18 @@ export const KpiView: React.FC = () => {
             </div>
 
             <div className="mt-4 space-y-3">
-              {weightsModalKpi.details.map((det, dIdx) => (
-                <div key={det.id} className="flex items-center justify-between gap-3 text-xs">
+              {weightsModalCtx.labels.map((label, idx) => (
+                <div key={idx} className="flex items-center justify-between gap-3 text-xs">
                   <span className="font-semibold text-slate-800 truncate flex-1">
-                    {dIdx + 1}. {det.name}
+                    {idx + 1}. {label}
                   </span>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="number"
-                      value={editingWeights[dIdx] !== undefined ? editingWeights[dIdx] : 0}
+                      value={editingWeights[idx] !== undefined ? editingWeights[idx] : 0}
                       onChange={(e) => {
                         const nextW = [...editingWeights];
-                        nextW[dIdx] = Number(e.target.value);
+                        nextW[idx] = Number(e.target.value);
                         setEditingWeights(nextW);
                       }}
                       className="w-20 rounded-md border border-slate-300 px-2 py-1 text-right text-xs font-bold text-indigo-900"
@@ -539,12 +789,12 @@ export const KpiView: React.FC = () => {
                 <span className="font-bold text-slate-700">가중치 합계:</span>
                 <span
                   className={`font-bold ${
-                    editingWeights.reduce((a, b) => a + b, 0) === 100
+                    Math.round(editingWeights.reduce((a, b) => a + b, 0)) === 100
                       ? 'text-emerald-700'
                       : 'text-amber-700'
                   }`}
                 >
-                  {editingWeights.reduce((a, b) => a + b, 0)}%
+                  {Math.round(editingWeights.reduce((a, b) => a + b, 0) * 100) / 100}%
                 </span>
               </div>
             </div>
@@ -552,7 +802,7 @@ export const KpiView: React.FC = () => {
             <div className="mt-5 flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => setWeightsModalKpi(null)}
+                onClick={() => setWeightsModalCtx(null)}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
               >
                 취소

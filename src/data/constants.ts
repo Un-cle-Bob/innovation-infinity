@@ -1,4 +1,4 @@
-import { AppTabId, CorporateCard, Department, ExpenseCategory, FundSource, User } from '../types';
+import { AchievementCategory, AppTabId, CorporateCard, Department, ExpenseCategory, FundSource, User } from '../types';
 
 export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
   '인건비',
@@ -11,6 +11,30 @@ export const EXPENSE_CATEGORIES: ExpenseCategory[] = [
 ];
 
 export const FUND_SOURCES: FundSource[] = ['이월금', '기본사업비', '적정규모화'];
+
+/** 성과 실적 관리: 카테고리별 세부 선택 목록. '직접입력'을 고르면 자유 텍스트 입력으로 전환 */
+export const ACHIEVEMENT_SUBCATEGORY_OPTIONS: Record<AchievementCategory, string[]> = {
+  '위원회 운영': [
+    '대학혁신운영위원회',
+    '사업비관리위원회',
+    '자체평가위원회',
+    '성과관리위원회',
+    '중복집행방지위원회',
+    '직접입력',
+  ],
+  '규정·지침 정비': ['직접입력'],
+  '구성원 참여·의견수렴': ['교직원간담회', '직접입력'],
+  '성과확산': ['뉴스레터', '성과공유회', '직접입력'],
+  '업무협약 체결': ['직접입력'],
+};
+
+export const ACHIEVEMENT_CATEGORIES: AchievementCategory[] = [
+  '위원회 운영',
+  '규정·지침 정비',
+  '구성원 참여·의견수렴',
+  '성과확산',
+  '업무협약 체결',
+];
 
 /** 세목(비목 하위 세부 지출항목) 사전 목록. 목록에 없는 경우 '직접입력'으로 자유 입력 */
 export const SUB_CATEGORY_OPTIONS: string[] = [

@@ -151,6 +151,41 @@ export interface Program {
   updated_at: string;
 }
 
+/**
+ * 성과 실적 관리(7절 확장): 프로그램(교육/특강 등) 외의 실적 — 위원회 운영, 규정·지침 정비,
+ * 구성원 참여·의견수렴, 성과확산, 업무협약 체결 등을 기록한다.
+ */
+export type AchievementCategory =
+  | '위원회 운영'
+  | '규정·지침 정비'
+  | '구성원 참여·의견수렴'
+  | '성과확산'
+  | '업무협약 체결';
+
+export interface Achievement {
+  id: string;
+  category: AchievementCategory;
+  /** 카테고리별 사전 정의 목록 중 선택하거나, 직접입력으로 자유롭게 입력한 값 */
+  subcategory: string;
+  content: string;
+  department: string;
+  manager: string;
+  period: { start: string; end: string };
+  internal_approval_doc_number: string;
+  result_report_doc_number?: string;
+  status: ItemStatus;
+  /**
+   * 실적을 셀 수 있는 값 (해당 시에만 입력) — 예: 위원회 개최 1회, 참여인원 45명, 협약 체결 2건.
+   * metric_unit과 함께 입력하면 실적보고서에서 "OOO위원회 3회"처럼 자동으로 합산·표시된다.
+   */
+  metric_value?: number;
+  /** metric_value의 단위 (예: 회, 건, 명) */
+  metric_unit?: string;
+  satisfaction_score?: number;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface SubMeasure {
   id: string;
   name: string;
@@ -169,6 +204,8 @@ export interface Measure {
   name: string;
   baseline: number;
   actual: number;
+  /** 세부측정지표별 가중치 (합계 1이 되도록 자동 정규화됨). 미설정 시 균등가중치로 단순평균과 동일하게 계산 */
+  weights?: number[];
   sub_measures: SubMeasure[];
 }
 
@@ -177,6 +214,8 @@ export interface KpiDetail {
   name: string;
   baseline: number;
   actual: number;
+  /** 목표값 (성과지표 관리대장 원본에 세부지표 단계까지 존재) */
+  target?: number | null;
   recommended_value?: number | null;
   weights?: number[];
   measures: Measure[];
@@ -228,6 +267,7 @@ export interface YearData {
   tasks: { [taskCode: string]: Task };
   executions: { [execId: string]: Execution };
   programs: { [programId: string]: Program };
+  achievements: { [id: string]: Achievement };
   kpis: KpiIndicator[];
   approval_requests: { [reqId: string]: ApprovalRequest };
 }

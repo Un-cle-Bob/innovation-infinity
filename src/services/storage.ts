@@ -1,5 +1,6 @@
 import { DEFAULT_CORPORATE_CARDS, DEFAULT_DEPARTMENTS, DEFAULT_USERS } from '../data/constants';
 import { SEED_EXECUTIONS_2026, SEED_PROGRAMS_2026 } from '../data/seedExecutions';
+import { SEED_ACHIEVEMENTS_2026 } from '../data/seedAchievements';
 import { SEED_KPIS_2026 } from '../data/seedKpis';
 import { SEED_TASKS_2026 } from '../data/seedTasks';
 import { recalculateKpiTree } from './kpiEngine';
@@ -69,6 +70,7 @@ export function loadYearData(year: number): YearData {
       tasks: JSON.parse(JSON.stringify(SEED_TASKS_2026)),
       executions: JSON.parse(JSON.stringify(SEED_EXECUTIONS_2026)),
       programs: JSON.parse(JSON.stringify(SEED_PROGRAMS_2026)),
+      achievements: JSON.parse(JSON.stringify(SEED_ACHIEVEMENTS_2026)),
       kpis: recalculateKpiTree(JSON.parse(JSON.stringify(SEED_KPIS_2026))),
       approval_requests: {},
     };
@@ -88,6 +90,7 @@ export function loadYearData(year: number): YearData {
     tasks: baseTasks,
     executions: {},
     programs: {},
+    achievements: {},
     kpis: recalculateKpiTree(JSON.parse(JSON.stringify(SEED_KPIS_2026))),
     approval_requests: {},
   };
@@ -183,6 +186,7 @@ export function cloneYearData(sourceYear: number, newYear: number): YearData {
     tasks: clonedTasks,
     executions: {}, // 집행내역 전체 초기화
     programs: clonedPrograms,
+    achievements: {}, // 성과 실적도 연도별로 새로 기록
     kpis: recalculateKpiTree(clonedKpis),
     approval_requests: {}, // 승인요청 초기화
   };

@@ -945,69 +945,81 @@ export const TasksView: React.FC = () => {
 
                                   {/* 관련 실적(세부프로그램) 요약 패널 */}
                                   {isExpandedItem && !isEditingItem && (
-                                    <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50/40 p-2.5 space-y-1.5">
+                                    <div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50/40 p-2.5 space-y-2">
                                       {linkedPrograms.length === 0 ? (
                                         <p className="text-[11px] text-slate-500">
                                           이 항목에 연결된 세부프로그램이 아직 없습니다.
                                         </p>
                                       ) : (
-                                        linkedPrograms.map((p) => {
-                                          const execAmount = executions
-                                            .filter(
-                                              (e) =>
-                                                p.internal_approval_doc_number &&
-                                                e.internal_approval_doc_number === p.internal_approval_doc_number
-                                            )
-                                            .reduce((sum, e) => sum + e.amount, 0);
-                                          return (
-                                            <div
-                                              key={p.id}
-                                              className="rounded bg-white border border-emerald-100 px-2 py-1.5 text-[11px] space-y-1"
-                                            >
-                                              <div className="flex items-center justify-between gap-2">
-                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                  <span
-                                                    className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold border ${getStatusColor(
-                                                      p.status
-                                                    )}`}
-                                                  >
-                                                    {p.status}
-                                                  </span>
-                                                  <span className="font-semibold text-slate-800 truncate">
-                                                    {p.name}
-                                                    {p.round_label ? ` (${p.round_label})` : ''}
-                                                  </span>
-                                                </div>
-                                                <div className="shrink-0 text-slate-500">
-                                                  참여 {p.performance?.participants ?? 0}명
-                                                  {p.performance?.satisfaction_score
-                                                    ? ` · 만족도 ${p.performance.satisfaction_score.toFixed(1)}`
-                                                    : ''}
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                                                <span className="text-slate-500">
-                                                  실적별 집행액:{' '}
-                                                  <strong className="font-mono font-bold text-emerald-700">
-                                                    ₩{execAmount.toLocaleString()}
-                                                  </strong>
-                                                </span>
-                                                {p.result_report_doc_number ? (
-                                                  <span className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-mono font-bold text-emerald-800">
-                                                    <FileText className="h-3 w-3" />
-                                                    {p.result_report_doc_number}
-                                                  </span>
-                                                ) : p.status === '완료' ? (
-                                                  <span className="inline-flex items-center gap-1 rounded border border-rose-300 bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
-                                                    결과보고서 미제출
-                                                  </span>
-                                                ) : (
-                                                  <span className="text-[10px] text-slate-300">결과보고서 -</span>
+                                        (() => {
+                                          // 통기안(같은 내부결재문서번호를 공유하는 프로그램 묶음)은 문서번호끼리만 모아서 보여줌
+                                          // (집행액은 이 패널에서 다루지 않음 — 항목 단위 집행액은 아래 항목 헤더에 별도 표시)
+                                          const groups = new Map<string, typeof linkedPrograms>();
+                                          linkedPrograms.forEach((p) => {
+                                            const key = p.internal_approval_doc_number || `__단독__${p.id}`;
+                                            if (!groups.has(key)) groups.set(key, []);
+                                            groups.get(key)!.push(p);
+                                          });
+
+                                          return Array.from(groups.entries()).map(([docKey, groupPrograms]) => {
+                                            const isBundled = groupPrograms.length > 1;
+
+                                            return (
+                                              <div
+                                                key={docKey}
+                                                className="rounded bg-white border border-emerald-100 px-2 py-1.5 text-[11px] space-y-1"
+                                              >
+                                                {isBundled && (
+                                                  <div className="flex items-center gap-1.5 pb-1 border-b border-dashed border-emerald-200">
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700">
+                                                      <FileText className="h-3 w-3" />
+                                                      통기안 {groupPrograms.length}건 ({groupPrograms[0].internal_approval_doc_number})
+                                                    </span>
+                                                  </div>
                                                 )}
+                                                {groupPrograms.map((p) => (
+                                                  <div key={p.id} className="space-y-1">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                      <div className="flex items-center gap-1.5 min-w-0">
+                                                        <span
+                                                          className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold border ${getStatusColor(
+                                                            p.status
+                                                          )}`}
+                                                        >
+                                                          {p.status}
+                                                        </span>
+                                                        <span className="font-semibold text-slate-800 truncate">
+                                                          {p.name}
+                                                          {p.round_label ? ` (${p.round_label})` : ''}
+                                                        </span>
+                                                      </div>
+                                                      <div className="shrink-0 text-slate-500">
+                                                        참여 {p.performance?.participants ?? 0}명
+                                                        {p.performance?.satisfaction_score
+                                                          ? ` · 만족도 ${p.performance.satisfaction_score.toFixed(1)}`
+                                                          : ''}
+                                                      </div>
+                                                    </div>
+                                                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                                                      {p.result_report_doc_number ? (
+                                                        <span className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-mono font-bold text-emerald-800">
+                                                          <FileText className="h-3 w-3" />
+                                                          {p.result_report_doc_number}
+                                                        </span>
+                                                      ) : p.status === '완료' ? (
+                                                        <span className="inline-flex items-center gap-1 rounded border border-rose-300 bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
+                                                          결과보고서 미제출
+                                                        </span>
+                                                      ) : (
+                                                        <span className="text-[10px] text-slate-300">결과보고서 -</span>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                ))}
                                               </div>
-                                            </div>
-                                          );
-                                        })
+                                            );
+                                          });
+                                        })()
                                       )}
                                     </div>
                                   )}
@@ -1058,6 +1070,22 @@ export const TasksView: React.FC = () => {
                               </div>
 
                               <div className="flex items-center gap-2 shrink-0 pl-8 sm:pl-0">
+                                {(() => {
+                                  // 항목(item.code) 코드로 등록된 모든 집행내역의 합 — 문서번호 매칭이 아니라
+                                  // task_code+item_code로 직접 집계하므로 통기안이 있어도 중복될 일이 없음
+                                  const itemExecAmount = executions
+                                    .filter((e) => e.task_code === task.code && e.item_code === item.code)
+                                    .reduce((sum, e) => sum + e.amount, 0);
+                                  return (
+                                    <div className="text-right">
+                                      <span className="block text-[9px] font-semibold text-slate-400">집행액</span>
+                                      <span className="text-xs font-bold text-emerald-700 font-mono tabular-nums">
+                                        ₩{itemExecAmount.toLocaleString()}
+                                      </span>
+                                    </div>
+                                  );
+                                })()}
+
                                 <select
                                   value={item.status}
                                   disabled={!canEditTab('tasks')}

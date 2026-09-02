@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { ItemStatus, Program, Task, TaskItem } from '../types';
 import { getDomainCode, getDomainColorTheme } from '../utils/domainColors';
+import { AchievementSection } from './AchievementSection';
 import {
   Plus,
   Search,
@@ -18,6 +19,8 @@ import {
   FileText,
   Link,
   Sparkles,
+  DollarSign,
+  MessageSquare,
   ChevronDown,
   ArrowUp,
   ArrowDown,
@@ -73,6 +76,9 @@ export const ProgramsView: React.FC = () => {
   const canEdit = canEditTab('programs');
   const canDelete = canDeleteTab('programs');
 
+  // 실적 관리: 프로그램 실적 / 성과 실적(위원회·규정정비·구성원참여 등) 전환
+  const [recordMode, setRecordMode] = useState<'program' | 'achievement'>('program');
+
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDeptFilter, setSelectedDeptFilter] = useState<string>('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
@@ -109,6 +115,14 @@ export const ProgramsView: React.FC = () => {
 
   // Custom Delete Confirm State (fixes iframe window.confirm issues)
   const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
+
+  // 배정예산 / 추진일정 / 내부결재문서번호 편집 모달 (그룹 통합 셀이라 인라인 편집이 어려워 별도 모달로 처리)
+  const [budgetEditTarget, setBudgetEditTarget] = useState<Program | null>(null);
+  const [editAllocatedBudget, setEditAllocatedBudget] = useState('');
+  const [editPeriodStart, setEditPeriodStart] = useState('');
+  const [editPeriodEnd, setEditPeriodEnd] = useState('');
+  const [editDocNumber, setEditDocNumber] = useState('');
+  const [editEtcNote, setEditEtcNote] = useState('');
 
   const taskList = Object.values(tasks) as Task[];
   const currentTask = tasks[taskCode];
@@ -504,6 +518,27 @@ export const ProgramsView: React.FC = () => {
     }
   };
 
+  const handleOpenBudgetEdit = (prog: Program) => {
+    setBudgetEditTarget(prog);
+    setEditAllocatedBudget(String(prog.execution_amount_allocated ?? prog.budget ?? 0));
+    setEditPeriodStart(prog.period?.start || '');
+    setEditPeriodEnd(prog.period?.end || '');
+    setEditDocNumber(prog.internal_approval_doc_number || '');
+    setEditEtcNote(prog.performance?.etc_note || '');
+  };
+
+  const handleSaveBudgetEdit = () => {
+    if (!budgetEditTarget) return;
+    updateProgram(budgetEditTarget.id, {
+      execution_amount_allocated: Number(editAllocatedBudget) || 0,
+      budget: Number(editAllocatedBudget) || 0,
+      period: { start: editPeriodStart, end: editPeriodEnd },
+      internal_approval_doc_number: editDocNumber.trim(),
+      performance: { ...budgetEditTarget.performance, etc_note: editEtcNote.trim() },
+    });
+    setBudgetEditTarget(null);
+  };
+
   const activeFilterCount =
     (selectedDeptFilter !== 'ALL' ? 1 : 0) +
     (selectedStatusFilter !== 'ALL' ? 1 : 0) +
@@ -527,19 +562,43 @@ export const ProgramsView: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold text-slate-900">실적 관리</h2>
-            {activeFilterCount > 0 && (
+            {recordMode === 'program' && activeFilterCount > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200">
                 필터 {activeFilterCount}개 적용중
               </span>
             )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            세부프로그램별 영역·과제·추진항목 코드 연계 · 결재문서별 예산/실집행액 통합 묶음 · 참여인원 및 만족도 관리
+            {recordMode === 'program'
+              ? '세부프로그램별 영역·과제·추진항목 코드 연계 · 결재문서별 예산/실집행액 통합 묶음 · 참여인원 및 만족도 관리'
+              : '위원회 운영 · 규정·지침 정비 · 구성원 참여·의견수렴 · 성과확산 · 업무협약 체결 등 프로그램 외 실적 관리'}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {activeFilterCount > 0 && (
+          {/* 프로그램 실적 / 성과 실적 전환 */}
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1">
+            <button
+              onClick={() => setRecordMode('program')}
+              className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all ${
+                recordMode === 'program' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              프로그램 실적 관리
+            </button>
+            <button
+              onClick={() => setRecordMode('achievement')}
+              className={`rounded-md px-3 py-1.5 text-xs font-bold transition-all ${
+                recordMode === 'achievement'
+                  ? 'bg-white text-indigo-700 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              성과 실적 관리
+            </button>
+          </div>
+
+          {recordMode === 'program' && activeFilterCount > 0 && (
             <button
               onClick={resetAllFilters}
               className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors shadow-2xs"
@@ -549,7 +608,7 @@ export const ProgramsView: React.FC = () => {
             </button>
           )}
 
-          {canEdit && (
+          {recordMode === 'program' && canEdit && (
             <button
               onClick={() => handleOpenAddModal()}
               className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-xs"
@@ -561,6 +620,10 @@ export const ProgramsView: React.FC = () => {
         </div>
       </div>
 
+      {recordMode === 'achievement' ? (
+        <AchievementSection />
+      ) : (
+        <>
       {/* 2. Unlinked Executions Notice (Smart Linking) */}
       {canEdit && unlinkedDocNumbers.length > 0 && (
         <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 p-4 shadow-2xs">
@@ -753,7 +816,7 @@ export const ProgramsView: React.FC = () => {
                   </div>
                 </th>
 
-                {/* 주요추진항목 코드 */}
+                {/* 추진항목 코드 */}
                 <th className="py-2.5 px-3 w-28">
                   <div
                     onClick={() => handleSort('item_code')}
@@ -992,7 +1055,7 @@ export const ProgramsView: React.FC = () => {
                         )}
                       </td>
 
-                      {/* 주요추진항목 코드 (수정 가능) */}
+                      {/* 추진항목 코드 (수정 가능) */}
                       <td className="py-2.5 px-3">
                         {isEditing ? (
                           <select
@@ -1012,7 +1075,7 @@ export const ProgramsView: React.FC = () => {
                           </select>
                         ) : (
                           <span
-                            className="font-mono text-xs text-slate-600 cursor-help"
+                            className={`font-mono text-xs font-semibold cursor-help px-1 rounded ${domainTheme.bg} ${domainTheme.text}`}
                             title={`${prog.item_code}: ${item?.name || ''}`}
                           >
                             {prog.item_code}
@@ -1044,7 +1107,7 @@ export const ProgramsView: React.FC = () => {
                           <div className="flex items-center gap-1.5 truncate">
                             {rowItem.isGrouped && (
                               <span className="shrink-0 rounded-xs bg-indigo-100 text-indigo-700 px-1 py-0.2 text-[10px] font-bold">
-                                묶음
+                                통기안
                               </span>
                             )}
                             <span
@@ -1056,6 +1119,14 @@ export const ProgramsView: React.FC = () => {
                             {prog.round_label && (
                               <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
                                 {prog.round_label}
+                              </span>
+                            )}
+                            {prog.performance?.etc_note && (
+                              <span
+                                className="shrink-0 text-amber-500 cursor-help"
+                                title={`비고: ${prog.performance.etc_note}`}
+                              >
+                                <MessageSquare className="h-3 w-3" />
                               </span>
                             )}
                           </div>
@@ -1125,7 +1196,7 @@ export const ProgramsView: React.FC = () => {
                               </span>
                               {rowItem.isGrouped && (
                                 <span className="text-[10px] font-normal text-indigo-600 mt-0.5 block">
-                                  {rowItem.groupSpan}개 프로그램 묶음결재
+                                  {rowItem.groupSpan}개 프로그램 통기안
                                 </span>
                               )}
                             </div>
@@ -1346,6 +1417,15 @@ export const ProgramsView: React.FC = () => {
                                 <Edit2 className="h-3.5 w-3.5" />
                               </button>
                             )}
+                            {canEdit && (
+                              <button
+                                onClick={() => handleOpenBudgetEdit(prog)}
+                                className="text-slate-400 hover:text-emerald-600 p-1 rounded hover:bg-emerald-50 transition-colors"
+                                title="배정예산 / 추진일정 / 문서번호 / 비고 수정"
+                              >
+                                <DollarSign className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                             {canDelete && (
                               <button
                                 onClick={() => setDeleteTarget(prog)}
@@ -1431,6 +1511,104 @@ export const ProgramsView: React.FC = () => {
         </div>
       )}
 
+      {/* 5-B. 배정예산 / 추진일정 / 내부결재문서번호 편집 모달 */}
+      {budgetEditTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">배정예산 / 추진일정 / 문서번호 / 비고 수정</h3>
+                <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[280px]">{budgetEditTarget.name}</p>
+              </div>
+              <button
+                onClick={() => setBudgetEditTarget(null)}
+                className="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">배정예산 (₩)</label>
+                <input
+                  type="number"
+                  value={editAllocatedBudget}
+                  onChange={(e) => setEditAllocatedBudget(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">추진일정 시작</label>
+                  <input
+                    type="date"
+                    value={editPeriodStart}
+                    onChange={(e) => setEditPeriodStart(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">추진일정 종료</label>
+                  <input
+                    type="date"
+                    value={editPeriodEnd}
+                    onChange={(e) => setEditPeriodEnd(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  내부결재문서번호 (집행연계) ★
+                </label>
+                <input
+                  type="text"
+                  value={editDocNumber}
+                  onChange={(e) => setEditDocNumber(e.target.value)}
+                  placeholder="예: 입학-2026-0210"
+                  className="w-full rounded-lg border border-amber-300 bg-amber-50/40 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">
+                  집행내역의 내부결재문서번호와 정확히 일치해야 실적-집행 연동이 이루어집니다. 이미 다른 곳에서
+                  참조 중인 문서번호를 바꾸면 기존 연동이 끊어질 수 있으니 주의하세요.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">비고 및 성과 메모</label>
+                <textarea
+                  value={editEtcNote}
+                  onChange={(e) => setEditEtcNote(e.target.value)}
+                  rows={2}
+                  placeholder="특이사항이나 참고 메모를 남겨주세요"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setBudgetEditTarget(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveBudgetEdit}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 shadow-xs"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 6. New Program Registration Modal */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
@@ -1439,7 +1617,7 @@ export const ProgramsView: React.FC = () => {
               <div>
                 <h3 className="text-base font-bold text-slate-900">실적 프로그램 신규 등록</h3>
                 <p className="text-xs text-slate-500">
-                  세부과제 및 주요추진항목에 연계하여 실적 프로그램을 등록합니다.
+                  세부과제 및 추진항목에 연계하여 실적 프로그램을 등록합니다.
                 </p>
               </div>
               <button
@@ -1472,7 +1650,7 @@ export const ProgramsView: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 mb-1">
-                    주요추진항목 코드 선택 *
+                    추진항목 코드 선택 *
                   </label>
                   <select
                     value={itemCode}
@@ -1684,6 +1862,8 @@ export const ProgramsView: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
