@@ -25,6 +25,117 @@ import {
 export const ReportsView: React.FC = () => {
   const { currentYear, tasks, executions, programs, achievements, kpis } = useApp();
 
+  // KPI 보고서용: 지표 → 세부지표 → 측정지표 → 세부측정지표를 총괄표처럼 왼쪽 고정열(rowSpan)로 펼쳐서 보여주기 위한
+  // 평탄화(flatten) 계산. 각 행은 세부측정지표 1개(또는 측정지표 자체 소계 1행)에 대응한다.
+  const kpiReportRows = useMemo(() => {
+    type Row = {
+      key: string;
+      kpiName: string;
+      kpiRowSpan: number;
+      isKpiFirst: boolean;
+      kpiBaseline: number;
+      kpiTarget: number;
+      kpiActual: number;
+      kpiAchRate: number;
+      detailName: string;
+      detailRowSpan: number;
+      isDetailFirst: boolean;
+      detailBaseline: number;
+      detailTarget: number | null;
+      detailActual: number;
+      measureName: string;
+      measureRowSpan: number;
+      isMeasureFirst: boolean;
+      subLabel: string;
+      isMeasureSelf: boolean;
+      baseline: number | string | null | undefined;
+      target: number | string | null | undefined;
+      actual: number | string | null | undefined;
+    };
+    const rows: Row[] = [];
+
+    kpis.forEach((kpi, kIdx) => {
+      const measureRowsCount = (m: (typeof kpi.details)[number]['measures'][number]) =>
+        1 + m.sub_measures.length;
+      const detailRowsCount = (d: (typeof kpi.details)[number]) =>
+        d.measures.reduce((sum, m) => sum + measureRowsCount(m), 0);
+      const kpiRowSpan = kpi.details.reduce((sum, d) => sum + detailRowsCount(d), 0) || 1;
+
+      let kpiRowUsed = false;
+      kpi.details.forEach((d, dIdx) => {
+        const detailRowSpan = detailRowsCount(d) || 1;
+        let detailRowUsed = false;
+        const detailTarget = d.target ?? d.recommended_value ?? null;
+
+        d.measures.forEach((m, mIdx) => {
+          const measureRowSpan = measureRowsCount(m);
+          let measureRowUsed = false;
+
+          // 측정지표 자체 소계 행
+          rows.push({
+            key: `${kpi.id}-${d.id}-${m.id}-self`,
+            kpiName: `${kIdx + 1}. ${kpi.name}`,
+            kpiRowSpan,
+            isKpiFirst: !kpiRowUsed,
+            kpiBaseline: kpi.baseline,
+            kpiTarget: kpi.target,
+            kpiActual: kpi.actual,
+            kpiAchRate: kpi.achievement * 100,
+            detailName: `${kIdx + 1}-${dIdx + 1}. ${d.name}`,
+            detailRowSpan,
+            isDetailFirst: !detailRowUsed,
+            detailBaseline: d.baseline,
+            detailTarget,
+            detailActual: d.actual,
+            measureName: `${kIdx + 1}-${dIdx + 1}-${mIdx + 1}) ${m.name}`,
+            measureRowSpan,
+            isMeasureFirst: true,
+            subLabel: '(측정지표 자체 소계)',
+            isMeasureSelf: true,
+            baseline: m.baseline,
+            target: '-',
+            actual: m.actual,
+          });
+          kpiRowUsed = true;
+          detailRowUsed = true;
+          measureRowUsed = true;
+
+          m.sub_measures.forEach((sm) => {
+            rows.push({
+              key: sm.id,
+              kpiName: `${kIdx + 1}. ${kpi.name}`,
+              kpiRowSpan,
+              isKpiFirst: !kpiRowUsed,
+              kpiBaseline: kpi.baseline,
+              kpiTarget: kpi.target,
+              kpiActual: kpi.actual,
+              kpiAchRate: kpi.achievement * 100,
+              detailName: `${kIdx + 1}-${dIdx + 1}. ${d.name}`,
+              detailRowSpan,
+              isDetailFirst: !detailRowUsed,
+              detailBaseline: d.baseline,
+              detailTarget,
+              detailActual: d.actual,
+              measureName: `${kIdx + 1}-${dIdx + 1}-${mIdx + 1}) ${m.name}`,
+              measureRowSpan,
+              isMeasureFirst: false,
+              subLabel: sm.name,
+              isMeasureSelf: false,
+              baseline: sm.baseline,
+              target: sm.recommended_value,
+              actual: sm.actual,
+            });
+            kpiRowUsed = true;
+            detailRowUsed = true;
+          });
+        });
+      });
+    });
+
+    return rows;
+  }, [kpis]);
+
+
   const [reportType, setReportType] = useState<'budget' | 'performance'>('budget');
   const [selectedDomain, setSelectedDomain] = useState<string>('ALL');
 
@@ -371,10 +482,10 @@ export const ReportsView: React.FC = () => {
   ];
   const PERF_SECTIONS = [
     { key: 'perf-1', label: '1. 5대 자율성과지표(KPI) 종합 달성 현황' },
-    { key: 'perf-2', label: '2. 세부프로그램 총괄 운영 및 성과 요약' },
-    { key: 'perf-3', label: '3. 월별 및 누적 프로그램 운영·참여 실적' },
-    { key: 'perf-4', label: '4. 세부프로그램별 실적 및 성과 상세 내역' },
-    { key: 'perf-5', label: '5. 프로그램 외 성과 실적' },
+    { key: 'perf-5', label: '2. 사업 성과 실적' },
+    { key: 'perf-2', label: '3. 세부프로그램 총괄 운영 및 성과 요약' },
+    { key: 'perf-3', label: '4. 월별 및 누적 프로그램 운영·참여 실적' },
+    { key: 'perf-4', label: '5. 세부프로그램별 실적 및 성과 상세 내역' },
   ];
   const [enabledSections, setEnabledSections] = useState<Record<string, boolean>>({});
   const isSectionOn = (key: string) => enabledSections[key] !== false;
@@ -1108,123 +1219,157 @@ export const ReportsView: React.FC = () => {
                 1. 대학혁신 5대 자율성과지표(KPI) 종합 달성 현황
               </h3>
 
-              {/* 지표 → 세부지표 → 측정지표 → 세부측정지표 4단계를 엑셀 대장처럼 숫자 위주로 정리.
-                  목표값 칸은 있는 값(세부지표는 목표값, 없으면 권장값)을 그대로 보여주고, 달성도는 최상위 지표에만 표시 */}
+              {/* 지표 → 세부지표 → 측정지표 → 세부측정지표를 총괄표처럼 왼쪽 고정열(rowSpan)로 펼쳐서 표시 */}
               <table className="w-full text-[11px] text-left border-collapse border border-slate-400 table-fixed">
                 <colgroup>
-                  <col style={{ width: '42%' }} />
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: '14%' }} />
-                  <col style={{ width: '14%' }} />
+                  <col style={{ width: '15%' }} />
                   <col style={{ width: '16%' }} />
+                  <col style={{ width: '17%' }} />
+                  <col style={{ width: '18%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '11%' }} />
+                  <col style={{ width: '12%' }} />
                 </colgroup>
                 <thead className="bg-slate-200 font-bold text-slate-800 text-center">
                   <tr>
-                    <th className="border border-slate-400 p-1.5 text-left">지표 체계</th>
+                    <th className="border border-slate-400 p-1.5 text-left">자율성과지표</th>
+                    <th className="border border-slate-400 p-1.5 text-left">세부지표</th>
+                    <th className="border border-slate-400 p-1.5 text-left">측정지표</th>
+                    <th className="border border-slate-400 p-1.5 text-left">세부측정지표</th>
                     <th className="border border-slate-400 p-1.5">기준값</th>
                     <th className="border border-slate-400 p-1.5">목표값</th>
                     <th className="border border-slate-400 p-1.5">실적값</th>
-                    <th className="border border-slate-400 p-1.5">달성도</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {kpis.map((kpi, kIdx) => {
-                    const achRate = kpi.achievement * 100;
-                    return (
-                      <React.Fragment key={kpi.id}>
-                        {/* Level 0: 자율성과지표 */}
-                        <tr className="bg-slate-100 font-bold">
-                          <td className="border border-slate-400 p-1.5 text-slate-900">
-                            {kIdx + 1}. {kpi.name}
-                          </td>
-                          <td className="border border-slate-400 p-1.5 text-center font-mono">{kpi.baseline}</td>
-                          <td className="border border-slate-400 p-1.5 text-center font-mono">{kpi.target}</td>
-                          <td className="border border-slate-400 p-1.5 text-center font-mono">{kpi.actual}</td>
-                          <td className="border border-slate-400 p-1.5 text-center font-mono text-emerald-800">
-                            {achRate.toFixed(1)}%
-                          </td>
-                        </tr>
-
-                        {/* Level 1: 세부지표 */}
-                        {kpi.details.map((d, dIdx) => {
-                          const detailTarget = d.target ?? d.recommended_value ?? null;
-                          return (
-                          <React.Fragment key={d.id}>
-                            <tr className="bg-white">
-                              <td className="border border-slate-400 py-1 pr-2 pl-6 font-semibold text-slate-800">
-                                {kIdx + 1}-{dIdx + 1}. {d.name}
-                              </td>
-                              <td className="border border-slate-400 p-1 text-center font-mono text-slate-600">
-                                {d.baseline}
-                              </td>
-                              <td className="border border-slate-400 p-1 text-center font-mono text-slate-600">
-                                {detailTarget ?? '-'}
-                              </td>
-                              <td className="border border-slate-400 p-1 text-center font-mono font-semibold text-slate-800">
-                                {d.actual}
-                              </td>
-                              <td className="border border-slate-400 p-1 text-center text-slate-300">-</td>
-                            </tr>
-
-                            {/* Level 2: 측정지표 */}
-                            {d.measures.map((m, mIdx) => (
-                              <React.Fragment key={m.id}>
-                                <tr className="bg-slate-50">
-                                  <td className="border border-slate-400 py-1 pr-2 pl-10 text-slate-700">
-                                    {kIdx + 1}-{dIdx + 1}-{mIdx + 1}) {m.name}
-                                  </td>
-                                  <td className="border border-slate-400 p-1 text-center font-mono text-slate-500">
-                                    {m.baseline}
-                                  </td>
-                                  <td className="border border-slate-400 p-1 text-center text-slate-300">-</td>
-                                  <td className="border border-slate-400 p-1 text-center font-mono text-slate-700">
-                                    {m.actual}
-                                  </td>
-                                  <td className="border border-slate-400 p-1 text-center text-slate-300">-</td>
-                                </tr>
-
-                                {/* Level 3: 세부측정지표 */}
-                                {m.sub_measures.map((sm) => (
-                                  <tr key={sm.id} className="bg-white">
-                                    <td className="border border-slate-400 py-1 pr-2 pl-14 text-[10px] text-slate-600">
-                                      · {sm.name}
-                                    </td>
-                                    <td className="border border-slate-400 p-1 text-center font-mono text-[10px] text-slate-400">
-                                      {sm.baseline ?? '-'}
-                                    </td>
-                                    <td className="border border-slate-400 p-1 text-center font-mono text-[10px] text-slate-400">
-                                      {sm.recommended_value ?? '-'}
-                                    </td>
-                                    <td className="border border-slate-400 p-1 text-center font-mono text-[10px] font-semibold text-slate-700">
-                                      {sm.actual ?? '-'}
-                                    </td>
-                                    <td className="border border-slate-400 p-1 text-center text-slate-300">-</td>
-                                  </tr>
-                                ))}
-                              </React.Fragment>
-                            ))}
-                          </React.Fragment>
-                          );
-                        })}
-                      </React.Fragment>
-                    );
-                  })}
+                  {kpiReportRows.map((row) => (
+                    <tr key={row.key} className={row.isMeasureSelf ? 'bg-slate-50' : 'bg-white'}>
+                      {row.isKpiFirst && (
+                        <td
+                          rowSpan={row.kpiRowSpan}
+                          className="border border-slate-400 p-1.5 align-top bg-indigo-50 font-extrabold text-slate-900"
+                        >
+                          <div>{row.kpiName}</div>
+                          <div className="mt-1.5 font-normal text-[10px] text-slate-500 space-y-0.5">
+                            <div>기준 {row.kpiBaseline} · 목표 {row.kpiTarget} · 실적 {row.kpiActual}</div>
+                            <div className="font-bold text-emerald-700">달성도 {row.kpiAchRate.toFixed(1)}%</div>
+                          </div>
+                        </td>
+                      )}
+                      {row.isDetailFirst && (
+                        <td
+                          rowSpan={row.detailRowSpan}
+                          className="border border-slate-400 p-1.5 align-top font-bold text-slate-800"
+                        >
+                          <div>{row.detailName}</div>
+                          <div className="mt-1 font-normal text-[10px] text-slate-500">
+                            기준 {row.detailBaseline} · 목표 {row.detailTarget ?? '-'} · 실적 {row.detailActual}
+                          </div>
+                        </td>
+                      )}
+                      {row.isMeasureFirst && (
+                        <td
+                          rowSpan={row.measureRowSpan}
+                          className="border border-slate-400 p-1.5 align-top text-slate-700"
+                        >
+                          {row.measureName}
+                        </td>
+                      )}
+                      <td
+                        className={`border border-slate-400 p-1.5 ${
+                          row.isMeasureSelf ? 'italic text-slate-400' : 'text-slate-600'
+                        }`}
+                      >
+                        {row.isMeasureSelf ? row.subLabel : `· ${row.subLabel}`}
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-center font-mono text-slate-600">
+                        {row.baseline ?? '-'}
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-center font-mono text-slate-600">
+                        {row.target ?? '-'}
+                      </td>
+                      <td className="border border-slate-400 p-1.5 text-center font-mono font-semibold text-slate-800">
+                        {row.actual ?? '-'}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
               <p className="text-[10px] text-slate-400 mt-1.5">
-                ※ 목표값은 세부지표까지만 존재합니다(측정지표·세부측정지표는 성과지표 관리대장 원본에 목표값 항목이
-                없음). 세부지표에 목표값이 없는 경우 참고용 권장값을 대신 표시했습니다. 달성도는 목표 대비 실적
+                ※ 목표값은 자율성과지표·세부지표까지만 존재합니다(측정지표·세부측정지표는 성과지표 관리대장 원본에
+                목표값 항목이 없어, 세부측정지표는 참고용 권장값을 대신 표시했습니다). 달성도는 목표 대비 실적
                 개념이 있는 최상위 자율성과지표에만 표시됩니다.
               </p>
             </div>
             )}
 
-            {/* 2) Overall Performance Summary */}
+            {/* 2) 사업 성과 실적 (위원회 운영 · 규정정비 · 구성원참여 · 성과확산 · 업무협약) */}
+            {filteredAchievements.length > 0 && isSectionOn('perf-5') && (
+              <div>
+                <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
+                  2. 사업 성과 실적 (위원회 운영 · 규정정비 · 구성원참여 · 성과확산 · 업무협약)
+                </h3>
+                <div className="space-y-2.5">
+                  {ACHIEVEMENT_CATEGORIES.map((cat) => {
+                    const catItems = filteredAchievements.filter((a) => a.category === cat);
+                    if (catItems.length === 0) return null;
+
+                    const bySub = new Map<string, typeof catItems>();
+                    catItems.forEach((a) => {
+                      if (!bySub.has(a.subcategory)) bySub.set(a.subcategory, []);
+                      bySub.get(a.subcategory)!.push(a);
+                    });
+
+                    // 카테고리 전체 합계: metric_value가 있는 항목은 값을 더하고, 없는 항목은 1건으로 집계
+                    const catTotal = catItems.reduce((sum, a) => sum + (a.metric_value ?? 1), 0);
+                    const catUnit = catItems.find((a) => a.metric_unit)?.metric_unit || '건';
+
+                    return (
+                      <div key={cat} className="rounded-lg border border-slate-200 p-3">
+                        <div className="text-xs font-bold text-slate-900 mb-1.5">
+                          {cat} 실적 {catTotal}{catUnit}
+                        </div>
+                        <div className="space-y-2">
+                          {Array.from(bySub.entries()).map(([sub, items]) => {
+                            const subTotal = items.reduce((sum, a) => sum + (a.metric_value ?? 1), 0);
+                            const subUnit = items.find((a) => a.metric_unit)?.metric_unit || '건';
+                            return (
+                              <div key={sub} className="text-[11px]">
+                                <div className="font-semibold text-slate-800">
+                                  · {sub} {subTotal}{subUnit}
+                                </div>
+                                <ul className="mt-0.5 pl-4 space-y-0.5">
+                                  {items.map((it) => {
+                                    const meta = [];
+                                    if (it.internal_approval_doc_number) meta.push(it.internal_approval_doc_number);
+                                    if (it.metric_value != null) meta.push(`${it.metric_value}${it.metric_unit || ''}`);
+                                    meta.push(it.period?.start || '일자 미정');
+                                    return (
+                                      <li key={it.id} className="text-slate-700">
+                                        {it.content}{' '}
+                                        <span className="text-slate-400">({meta.join(', ')})</span>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              )}
+
+            {/* 3) Overall Performance Summary */}
             {isSectionOn('perf-2') && (
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                2. 세부프로그램 총괄 운영 및 성과 요약
+                3. 세부프로그램 총괄 운영 및 성과 요약
               </h3>
               <table className="w-full text-xs text-left border-collapse border border-slate-300">
                 <thead className="bg-slate-100 font-bold text-slate-800 text-center">
@@ -1289,7 +1434,7 @@ export const ReportsView: React.FC = () => {
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                  3. 월별 및 누적 프로그램 운영 및 참여 실적 (3월 ~ 익년 2월)
+                  4. 월별 및 누적 프로그램 운영 및 참여 실적 (3월 ~ 익년 2월)
                 </h3>
                 {hideEmptyMonths && (
                   <span className="text-[11px] text-indigo-700 font-semibold">
@@ -1340,7 +1485,7 @@ export const ReportsView: React.FC = () => {
             <div>
               <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
                 <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                4. 세부프로그램별 실적 및 성과 상세 내역 ({filteredPrograms.length}개)
+                5. 세부프로그램별 실적 및 성과 상세 내역 ({filteredPrograms.length}개)
               </h3>
               <table className="w-full text-[11px] text-left border-collapse border border-slate-300">
                 <thead className="bg-slate-100 font-bold text-slate-800 text-center">
@@ -1427,68 +1572,7 @@ export const ReportsView: React.FC = () => {
             </div>
             )}
 
-            {/* 4) 5대 자율성과지표(KPI) 종합 달성 현황은 1번 섹션으로 이동됨 */}
-
-            {/* 5) 프로그램 외 성과 실적 (위원회 운영 · 규정정비 · 구성원참여 · 성과확산 · 업무협약) */}
-            {filteredAchievements.length > 0 && isSectionOn('perf-5') && (
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 mb-2 flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-4 bg-indigo-600 rounded-xs" />
-                  5. 프로그램 외 성과 실적 (위원회 운영 · 규정정비 · 구성원참여 · 성과확산 · 업무협약)
-                </h3>
-                <div className="space-y-2.5">
-                  {ACHIEVEMENT_CATEGORIES.map((cat) => {
-                    const catItems = filteredAchievements.filter((a) => a.category === cat);
-                    if (catItems.length === 0) return null;
-
-                    const bySub = new Map<string, typeof catItems>();
-                    catItems.forEach((a) => {
-                      if (!bySub.has(a.subcategory)) bySub.set(a.subcategory, []);
-                      bySub.get(a.subcategory)!.push(a);
-                    });
-
-                    // 카테고리 전체 합계: metric_value가 있는 항목은 값을 더하고, 없는 항목은 1건으로 집계
-                    const catTotal = catItems.reduce((sum, a) => sum + (a.metric_value ?? 1), 0);
-                    const catUnit = catItems.find((a) => a.metric_unit)?.metric_unit || '건';
-
-                    return (
-                      <div key={cat} className="rounded-lg border border-slate-200 p-3">
-                        <div className="text-xs font-bold text-slate-900 mb-1.5">
-                          {cat} 실적 {catTotal}{catUnit}
-                        </div>
-                        <div className="space-y-2">
-                          {Array.from(bySub.entries()).map(([sub, items]) => {
-                            const subTotal = items.reduce((sum, a) => sum + (a.metric_value ?? 1), 0);
-                            const subUnit = items.find((a) => a.metric_unit)?.metric_unit || '건';
-                            return (
-                              <div key={sub} className="text-[11px]">
-                                <div className="font-semibold text-slate-800">
-                                  · {sub} {subTotal}{subUnit}
-                                </div>
-                                <ul className="mt-0.5 pl-4 space-y-0.5">
-                                  {items.map((it) => {
-                                    const meta = [];
-                                    if (it.internal_approval_doc_number) meta.push(it.internal_approval_doc_number);
-                                    if (it.metric_value != null) meta.push(`${it.metric_value}${it.metric_unit || ''}`);
-                                    meta.push(it.period?.start || '일자 미정');
-                                    return (
-                                      <li key={it.id} className="text-slate-700">
-                                        {it.content}{' '}
-                                        <span className="text-slate-400">({meta.join(', ')})</span>
-                                      </li>
-                                    );
-                                  })}
-                                </ul>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              )}
+            {/* 5) 프로그램 외 성과 실적은 2번 섹션으로 이동됨 */}
           </div>
         )}
       </div>

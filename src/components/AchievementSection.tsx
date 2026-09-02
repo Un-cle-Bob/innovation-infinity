@@ -49,6 +49,7 @@ export const AchievementSection: React.FC = () => {
   const canDelete = canDeleteTab('programs');
 
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | AchievementCategory>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | ItemStatus>('ALL');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Achievement | null>(null);
@@ -57,8 +58,9 @@ export const AchievementSection: React.FC = () => {
   const filtered = useMemo(() => {
     return achievements
       .filter((a) => categoryFilter === 'ALL' || a.category === categoryFilter)
+      .filter((a) => statusFilter === 'ALL' || a.status === statusFilter)
       .sort((a, b) => (b.period?.start || '').localeCompare(a.period?.start || ''));
-  }, [achievements, categoryFilter]);
+  }, [achievements, categoryFilter, statusFilter]);
 
   const openAddModal = () => {
     setForm({ ...emptyForm });
@@ -171,6 +173,24 @@ export const AchievementSection: React.FC = () => {
         )}
       </div>
 
+      {/* 상태 필터 */}
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-bold text-slate-600">상태:</span>
+        {(['ALL', '예정', '진행중', '완료', '보류'] as const).map((st) => (
+          <button
+            key={st}
+            onClick={() => setStatusFilter(st)}
+            className={`rounded-md px-2.5 py-1 text-[11px] font-bold border transition-colors ${
+              statusFilter === st
+                ? 'bg-slate-800 text-white border-slate-800'
+                : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            {st === 'ALL' ? '전체' : st}
+          </button>
+        ))}
+      </div>
+
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
         <table className="w-full text-xs text-left border-collapse">
@@ -180,7 +200,7 @@ export const AchievementSection: React.FC = () => {
               <th className="py-2.5 px-3 min-w-[200px]">실적내용</th>
               <th className="py-2.5 px-3">담당</th>
               <th className="py-2.5 px-3">일정</th>
-              <th className="py-2.5 px-3">문서번호</th>
+              <th className="py-2.5 px-3">내부결재 문서번호</th>
               <th className="py-2.5 px-3">결과보고서</th>
               <th className="py-2.5 px-3 text-center">실적값</th>
               <th className="py-2.5 px-3 text-center">상태</th>
@@ -214,8 +234,15 @@ export const AchievementSection: React.FC = () => {
                     {a.period?.start || '-'}
                     {a.period?.end ? ` ~ ${a.period.end}` : ''}
                   </td>
-                  <td className="py-2.5 px-3 font-mono text-[11px] text-slate-600">
-                    {a.internal_approval_doc_number || '-'}
+                  <td className="py-2.5 px-3">
+                    {a.internal_approval_doc_number ? (
+                      <span className="inline-flex items-center gap-1 rounded border border-indigo-300 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-mono font-bold text-indigo-800">
+                        <FileText className="h-3 w-3" />
+                        {a.internal_approval_doc_number}
+                      </span>
+                    ) : (
+                      <span className="text-slate-300">-</span>
+                    )}
                   </td>
                   <td className="py-2.5 px-3">
                     {a.result_report_doc_number ? (
@@ -400,7 +427,7 @@ export const AchievementSection: React.FC = () => {
                   type="text"
                   value={form.internalDoc}
                   onChange={(e) => setForm({ ...form, internalDoc: e.target.value })}
-                  placeholder="예: 위원회-2026-0012"
+                  placeholder="예: 혁신-2026-0001"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                 />
               </div>
@@ -411,7 +438,7 @@ export const AchievementSection: React.FC = () => {
                   type="text"
                   value={form.resultDoc}
                   onChange={(e) => setForm({ ...form, resultDoc: e.target.value })}
-                  placeholder="예: 결과-2026-0030"
+                  placeholder="예: 혁신-2026-0001"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                 />
               </div>

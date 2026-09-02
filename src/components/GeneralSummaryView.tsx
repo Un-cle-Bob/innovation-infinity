@@ -30,7 +30,17 @@ export const GeneralSummaryView: React.FC = () => {
   const [customEndMonth, setCustomEndMonth] = useState<number>(2); // 2
   const [displayMode, setDisplayMode] = useState<'detailed' | 'compact'>('detailed'); // detailed: 4행(이월,기본,적정,계), compact: 1행(계)
   const [viewGranularity, setViewGranularity] = useState<'detail' | 'domain'>('detail'); // detail: 영역별×세부과제별, domain: 영역별 요약(세부과제 통합)
+  const [selectedFundFilter, setSelectedFundFilter] = useState<'ALL' | FundSource>('ALL'); // 특정 재원만 보기
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<'ALL' | ExpenseCategory>('ALL'); // 특정 비목만 보기
   const [searchQuery, setSearchQuery] = useState<string>('');
+
+  // 재원/비목 필터가 반영된 실제 표시 대상 목록 (영역/월별 필터와 상호작용)
+  const visibleCategories: ExpenseCategory[] =
+    selectedCategoryFilter === 'ALL' ? EXPENSE_CATEGORIES : [selectedCategoryFilter];
+  const getEffectiveSources = (): (FundSource | '합계')[] => {
+    if (selectedFundFilter !== 'ALL') return [selectedFundFilter];
+    return displayMode === 'detailed' ? ['이월금', '기본사업비', '적정규모화', '합계'] : ['합계'];
+  };
 
   // 가로 스크롤 동기화 (상단 고정 스크롤바 + 실제 표 스크롤 영역)
   const topScrollRef = React.useRef<HTMLDivElement>(null);
@@ -575,6 +585,56 @@ export const GeneralSummaryView: React.FC = () => {
           </div>
         </div>
 
+        {/* 재원 / 비목 필터 (영역·월별 필터와 상호작용) */}
+        <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-700">재원 선택:</span>
+            <div className="flex flex-wrap gap-1">
+              {(['ALL', '이월금', '기본사업비', '적정규모화'] as const).map((src) => (
+                <button
+                  key={src}
+                  onClick={() => setSelectedFundFilter(src)}
+                  className={`rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    selectedFundFilter === src
+                      ? 'bg-indigo-600 text-white font-bold shadow-2xs'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                  }`}
+                >
+                  {src === 'ALL' ? '전체 재원' : src}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-700">비목 선택:</span>
+            <select
+              value={selectedCategoryFilter}
+              onChange={(e) => setSelectedCategoryFilter(e.target.value as 'ALL' | ExpenseCategory)}
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+            >
+              <option value="ALL">전체 비목</option>
+              {EXPENSE_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {(selectedFundFilter !== 'ALL' || selectedCategoryFilter !== 'ALL') && (
+            <button
+              onClick={() => {
+                setSelectedFundFilter('ALL');
+                setSelectedCategoryFilter('ALL');
+              }}
+              className="inline-flex items-center gap-1 rounded-md border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-500 hover:bg-slate-50"
+            >
+              재원·비목 필터 초기화
+            </button>
+          )}
+        </div>
+
         {/* Period Selector (전문대학 회계연도: 3월 ~ 익년 2월) */}
         <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-slate-100">
           <div className="flex items-center gap-2">
@@ -831,7 +891,7 @@ export const GeneralSummaryView: React.FC = () => {
         >
           <table
             className="summary-print-table text-xs text-left border-collapse border border-slate-300 table-fixed print:w-full"
-            style={{ width: '2654px' }}
+            style={{ width: `${610 + visibleCategories.length * 292}px` }}
           >
             {/* 컬럼 폭을 고정해서 가로 스크롤 시에도 비목별 간격이 흔들리지 않게 함 */}
             <colgroup>
@@ -843,7 +903,7 @@ export const GeneralSummaryView: React.FC = () => {
               <col style={{ width: '116px' }} />
               <col style={{ width: '116px' }} />
               <col style={{ width: '60px' }} />
-              {EXPENSE_CATEGORIES.map((cat) => (
+              {visibleCategories.map((cat) => (
                 <React.Fragment key={`colgrp_${cat}`}>
                   <col style={{ width: '80px' }} />
                   <col style={{ width: '80px' }} />
@@ -885,7 +945,7 @@ export const GeneralSummaryView: React.FC = () => {
                 </th>
 
                 {/* 7 Expense Categories */}
-                {EXPENSE_CATEGORIES.map((cat, ci) => (
+                {visibleCategories.map((cat, ci) => (
                   <th
                     key={cat}
                     colSpan={4}
@@ -915,7 +975,7 @@ export const GeneralSummaryView: React.FC = () => {
                   집행률
                 </th>
 
-                {EXPENSE_CATEGORIES.map((cat, ci) => (
+                {visibleCategories.map((cat, ci) => (
                   <React.Fragment key={`${cat}_sub`}>
                     <th
                       className={`border border-slate-300 p-1 text-right font-medium ${
@@ -953,18 +1013,19 @@ export const GeneralSummaryView: React.FC = () => {
             {/* Table Body */}
             <tbody>
               {/* 1. Grand Total Rows (재원별 + 합계, 맨 상단 총계 하이라이트) */}
-              {(['이월금', '기본사업비', '적정규모화', '합계'] as const).map((src, gIdx) => {
+              {getEffectiveSources().map((src, gIdx) => {
                 const isTotal = src === '합계';
                 const gTot = grandTotalsBySource[src];
                 const fundColor = getFundColorTheme(src);
                 const rowBg = isTotal ? 'bg-amber-100' : 'bg-amber-50';
+                const grandRowSpan = getEffectiveSources().length;
 
                 return (
                   <tr key={`grand_${src}`} className={`font-bold text-slate-900 ${isTotal ? 'border-b-2 border-slate-400' : ''}`}>
                     {gIdx === 0 && (
                       <td
                         colSpan={2}
-                        rowSpan={4}
+                        rowSpan={grandRowSpan}
                         className="border border-slate-300 p-2 text-center font-extrabold bg-amber-100 sticky left-0 z-20"
                       >
                         【 전 체 총 계 】
@@ -999,7 +1060,7 @@ export const GeneralSummaryView: React.FC = () => {
                         </div>
                       </div>
                     </td>
-                    {EXPENSE_CATEGORIES.map((cat) => {
+                    {visibleCategories.map((cat) => {
                       const catTot = gTot.categoryTotals[cat];
                       const catRate = catTot.budget > 0 ? (catTot.executed / catTot.budget) * 100 : 0;
                       return (
@@ -1046,7 +1107,7 @@ export const GeneralSummaryView: React.FC = () => {
                           </div>
                         </td>
                         {(() => {
-                          const tot = getDomainTotalData(group.tasks);
+                          const tot = getDomainTotalData(group.tasks, selectedFundFilter !== 'ALL' ? selectedFundFilter : undefined);
                           return (
                             <>
                               <td className="border border-slate-300 p-1 text-right font-mono overflow-hidden text-ellipsis whitespace-nowrap text-xs font-bold text-slate-900 bg-slate-200">
@@ -1074,8 +1135,8 @@ export const GeneralSummaryView: React.FC = () => {
                             </>
                           );
                         })()}
-                        {EXPENSE_CATEGORIES.map((cat) => {
-                          const c = getDomainCellData(group.tasks, cat);
+                        {visibleCategories.map((cat) => {
+                          const c = getDomainCellData(group.tasks, cat, selectedFundFilter !== 'ALL' ? selectedFundFilter : undefined);
                           const cRate = c.budget > 0 ? (c.executed / c.budget) * 100 : 0;
                           return (
                             <React.Fragment key={`d_${group.domainCode}_${cat}`}>
@@ -1100,10 +1161,7 @@ export const GeneralSummaryView: React.FC = () => {
                     {/* 영역별 요약 모드: 재원별 행으로 펼쳐서 보여줌 (표시방식: 3재원 상세/합계 요약 반영) */}
                     {viewGranularity === 'domain' &&
                       (() => {
-                        const domainSources: (FundSource | '합계')[] =
-                          displayMode === 'detailed'
-                            ? ['이월금', '기본사업비', '적정규모화', '합계']
-                            : ['합계'];
+                        const domainSources: (FundSource | '합계')[] = getEffectiveSources();
                         const domainRowSpanCount = domainSources.length;
 
                         return domainSources.map((src, sIdx) => {
@@ -1160,7 +1218,7 @@ export const GeneralSummaryView: React.FC = () => {
                                 </div>
                               </div>
                             </td>
-                            {EXPENSE_CATEGORIES.map((cat) => {
+                            {visibleCategories.map((cat) => {
                               const c = getDomainCellData(group.tasks, cat, fundSrc);
                               const hasValue = c.budget > 0 || c.executed > 0;
                               const cRate = c.budget > 0 ? (c.executed / c.budget) * 100 : 0;
@@ -1193,10 +1251,7 @@ export const GeneralSummaryView: React.FC = () => {
                     {/* Task Rows inside domain (viewGranularity==='detail'일 때만) */}
                     {viewGranularity === 'detail' &&
                       group.tasks.map((task) => {
-                      const sources: (FundSource | '합계')[] =
-                        displayMode === 'detailed'
-                          ? ['이월금', '기본사업비', '적정규모화', '합계']
-                          : ['합계'];
+                      const sources: (FundSource | '합계')[] = getEffectiveSources();
 
                       const rowSpanCount = sources.length;
 
@@ -1290,7 +1345,7 @@ export const GeneralSummaryView: React.FC = () => {
                                 </td>
 
                                 {/* 7 Categories Cells */}
-                                {EXPENSE_CATEGORIES.map((cat) => {
+                                {visibleCategories.map((cat) => {
                                   const cellData = getTaskCellData(task, cat, fundSrc);
                                   const hasValue = cellData.budget > 0 || cellData.executed > 0;
                                   const cellRate =

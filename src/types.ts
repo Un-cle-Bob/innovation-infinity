@@ -145,6 +145,8 @@ export interface Program {
   status: ItemStatus;
   performance: {
     participants?: number;
+    /** 실적값의 단위 (예: 명, 회, 건) — 참여인원 외에도 다양한 실적값을 표현할 수 있도록 함 */
+    participants_unit?: string;
     satisfaction_score?: number;
     etc_note?: string;
   };

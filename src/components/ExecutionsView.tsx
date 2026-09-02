@@ -1849,7 +1849,7 @@ export const ExecutionsView: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      placeholder="예: 2026-기획-0142"
+                      placeholder="예: 혁신-2026-0001"
                       value={internalApprovalDocNumber}
                       onChange={(e) => setInternalApprovalDocNumber(e.target.value)}
                       className="w-full rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-mono font-bold text-indigo-900 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
@@ -1861,7 +1861,7 @@ export const ExecutionsView: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      placeholder="예: PAY-2026-0311"
+                      placeholder="예: 혁신-2026-0001"
                       value={invoiceDocNumber}
                       onChange={(e) => setInvoiceDocNumber(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-mono text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
@@ -1873,7 +1873,7 @@ export const ExecutionsView: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      placeholder="예: VOUCH-0891"
+                      placeholder="예: 20260101-00001"
                       value={voucherApprovalNumber}
                       onChange={(e) => setVoucherApprovalNumber(e.target.value)}
                       className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-mono text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"

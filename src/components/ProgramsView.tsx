@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { ItemStatus, Program, Task, TaskItem } from '../types';
 import { getDomainCode, getDomainColorTheme } from '../utils/domainColors';
+import { getTaskBudgetSummary } from '../services/budgetEngine';
 import { AchievementSection } from './AchievementSection';
 import {
   Plus,
@@ -20,7 +21,6 @@ import {
   Link,
   Sparkles,
   DollarSign,
-  MessageSquare,
   ChevronDown,
   ArrowUp,
   ArrowDown,
@@ -106,6 +106,7 @@ export const ProgramsView: React.FC = () => {
   const [status, setStatus] = useState<ItemStatus>('예정');
   const [resultReportDocNumber, setResultReportDocNumber] = useState<string>('');
   const [participants, setParticipants] = useState<number | ''>('');
+  const [participantsUnit, setParticipantsUnit] = useState<string>('명');
   const [satisfactionScore, setSatisfactionScore] = useState<number | ''>('');
   const [etcNote, setEtcNote] = useState<string>('');
 
@@ -116,8 +117,17 @@ export const ProgramsView: React.FC = () => {
   // Custom Delete Confirm State (fixes iframe window.confirm issues)
   const [deleteTarget, setDeleteTarget] = useState<Program | null>(null);
 
-  // 배정예산 / 추진일정 / 내부결재문서번호 편집 모달 (그룹 통합 셀이라 인라인 편집이 어려워 별도 모달로 처리)
+  // 프로그램 전체수정 모달 (등록폼과 동일한 항목을 전부 수정 가능하게 통합)
   const [budgetEditTarget, setBudgetEditTarget] = useState<Program | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editRoundLabel, setEditRoundLabel] = useState('');
+  const [editDepartment, setEditDepartment] = useState('');
+  const [editManager, setEditManager] = useState('');
+  const [editStatus, setEditStatus] = useState<ItemStatus>('예정');
+  const [editParticipants, setEditParticipants] = useState('');
+  const [editParticipantsUnit, setEditParticipantsUnit] = useState('명');
+  const [editSatisfaction, setEditSatisfaction] = useState('');
+  const [editResultDoc, setEditResultDoc] = useState('');
   const [editAllocatedBudget, setEditAllocatedBudget] = useState('');
   const [editPeriodStart, setEditPeriodStart] = useState('');
   const [editPeriodEnd, setEditPeriodEnd] = useState('');
@@ -127,6 +137,30 @@ export const ProgramsView: React.FC = () => {
   const taskList = Object.values(tasks) as Task[];
   const currentTask = tasks[taskCode];
   const currentItems = Object.values(currentTask?.items || {}) as TaskItem[];
+
+  /**
+   * 세부과제의 예산관리 배정 총액 대비, 이미 등록된 실적 프로그램들의 배정예산 합계 + 새로 반영할 금액이
+   * 초과하는지 확인. (excludeProgramId: 수정 중인 프로그램 본인은 합계에서 제외)
+   */
+  const checkProgramBudgetOverage = (
+    forTaskCode: string,
+    newAmount: number,
+    excludeProgramId?: string
+  ): { exceeds: boolean; taskBudget: number; alreadyAllocated: number; exceedAmount: number } => {
+    const task = tasks[forTaskCode];
+    if (!task) return { exceeds: false, taskBudget: 0, alreadyAllocated: 0, exceedAmount: 0 };
+    const taskBudget = getTaskBudgetSummary(task, executions).total_budget;
+    const alreadyAllocated = programs
+      .filter((p) => p.task_code === forTaskCode && p.id !== excludeProgramId)
+      .reduce((sum, p) => sum + (p.budget || 0), 0);
+    const totalAfter = alreadyAllocated + newAmount;
+    return {
+      exceeds: totalAfter > taskBudget,
+      taskBudget,
+      alreadyAllocated,
+      exceedAmount: Math.max(0, totalAfter - taskBudget),
+    };
+  };
 
   // 집행내역의 결재문서번호별 총 집행액 맵 (자동 연동)
   const execAmountByDocNumber = useMemo(() => {
@@ -451,6 +485,7 @@ export const ProgramsView: React.FC = () => {
     setStatus('진행중');
     setResultReportDocNumber('');
     setParticipants('');
+    setParticipantsUnit('명');
     setSatisfactionScore('');
     setEtcNote('');
     setIsAddModalOpen(true);
@@ -470,6 +505,17 @@ export const ProgramsView: React.FC = () => {
     e.preventDefault();
     if (!name.trim()) return;
 
+    const newBudget = Number(budget) || 0;
+    const overageCheck = checkProgramBudgetOverage(taskCode, newBudget);
+    if (overageCheck.exceeds) {
+      alert(
+        `배정예산이 세부과제 예산을 초과합니다.\n\n세부과제 총예산: ₩${overageCheck.taskBudget.toLocaleString()}\n` +
+          `이미 배정된 다른 프로그램 합계: ₩${overageCheck.alreadyAllocated.toLocaleString()}\n` +
+          `초과액: ₩${overageCheck.exceedAmount.toLocaleString()}\n\n금액을 줄여서 다시 시도해주세요.`
+      );
+      return;
+    }
+
     addProgram({
       task_code: taskCode,
       item_code: itemCode,
@@ -485,6 +531,7 @@ export const ProgramsView: React.FC = () => {
       status,
       performance: {
         participants: participants !== '' ? Number(participants) : undefined,
+        participants_unit: participants !== '' ? participantsUnit.trim() || '명' : undefined,
         satisfaction_score: satisfactionScore !== '' ? Number(satisfactionScore) : undefined,
         etc_note: etcNote.trim(),
       },
@@ -520,6 +567,17 @@ export const ProgramsView: React.FC = () => {
 
   const handleOpenBudgetEdit = (prog: Program) => {
     setBudgetEditTarget(prog);
+    setEditName(prog.name);
+    setEditRoundLabel(prog.round_label || '');
+    setEditDepartment(prog.department);
+    setEditManager(prog.manager);
+    setEditStatus(prog.status);
+    setEditParticipants(prog.performance?.participants != null ? String(prog.performance.participants) : '');
+    setEditParticipantsUnit(prog.performance?.participants_unit || '명');
+    setEditSatisfaction(
+      prog.performance?.satisfaction_score != null ? String(prog.performance.satisfaction_score) : ''
+    );
+    setEditResultDoc(prog.result_report_doc_number || '');
     setEditAllocatedBudget(String(prog.execution_amount_allocated ?? prog.budget ?? 0));
     setEditPeriodStart(prog.period?.start || '');
     setEditPeriodEnd(prog.period?.end || '');
@@ -529,12 +587,34 @@ export const ProgramsView: React.FC = () => {
 
   const handleSaveBudgetEdit = () => {
     if (!budgetEditTarget) return;
+    const newBudget = Number(editAllocatedBudget) || 0;
+    const check = checkProgramBudgetOverage(budgetEditTarget.task_code, newBudget, budgetEditTarget.id);
+    if (check.exceeds) {
+      alert(
+        `배정예산이 세부과제 예산을 초과합니다.\n\n세부과제 총예산: ₩${check.taskBudget.toLocaleString()}\n` +
+          `이미 배정된 다른 프로그램 합계: ₩${check.alreadyAllocated.toLocaleString()}\n` +
+          `초과액: ₩${check.exceedAmount.toLocaleString()}\n\n금액을 줄여서 다시 시도해주세요.`
+      );
+      return;
+    }
     updateProgram(budgetEditTarget.id, {
+      name: editName.trim() || budgetEditTarget.name,
+      round_label: editRoundLabel.trim(),
+      department: editDepartment,
+      manager: editManager.trim(),
+      status: editStatus,
       execution_amount_allocated: Number(editAllocatedBudget) || 0,
       budget: Number(editAllocatedBudget) || 0,
       period: { start: editPeriodStart, end: editPeriodEnd },
       internal_approval_doc_number: editDocNumber.trim(),
-      performance: { ...budgetEditTarget.performance, etc_note: editEtcNote.trim() },
+      result_report_doc_number: editResultDoc.trim() || undefined,
+      performance: {
+        ...budgetEditTarget.performance,
+        participants: editParticipants.trim() ? Number(editParticipants) : undefined,
+        participants_unit: editParticipants.trim() ? editParticipantsUnit.trim() || '명' : undefined,
+        satisfaction_score: editSatisfaction.trim() ? Number(editSatisfaction) : undefined,
+        etc_note: editEtcNote.trim(),
+      },
     });
     setBudgetEditTarget(null);
   };
@@ -561,7 +641,7 @@ export const ProgramsView: React.FC = () => {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h2 className="text-xl font-bold text-slate-900">실적 관리</h2>
+            <h2 className="text-xl font-bold text-slate-900">성과 관리</h2>
             {recordMode === 'program' && activeFilterCount > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold text-indigo-700 border border-indigo-200">
                 필터 {activeFilterCount}개 적용중
@@ -594,7 +674,7 @@ export const ProgramsView: React.FC = () => {
                   : 'text-slate-600 hover:text-slate-900'
               }`}
             >
-              성과 실적 관리
+              사업 관리 실적
             </button>
           </div>
 
@@ -975,6 +1055,9 @@ export const ProgramsView: React.FC = () => {
                   </span>
                 </th>
 
+                {/* 비고 */}
+                <th className="py-2.5 px-3 min-w-[160px]">비고</th>
+
                 {/* 관리 */}
                 <th className="py-2.5 px-3 w-20 text-center sticky right-0 bg-slate-900">관리</th>
               </tr>
@@ -1119,14 +1202,6 @@ export const ProgramsView: React.FC = () => {
                             {prog.round_label && (
                               <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold text-slate-600">
                                 {prog.round_label}
-                              </span>
-                            )}
-                            {prog.performance?.etc_note && (
-                              <span
-                                className="shrink-0 text-amber-500 cursor-help"
-                                title={`비고: ${prog.performance.etc_note}`}
-                              >
-                                <MessageSquare className="h-3 w-3" />
                               </span>
                             )}
                           </div>
@@ -1318,7 +1393,11 @@ export const ProgramsView: React.FC = () => {
                             className="w-14 rounded-md border border-slate-300 px-1 py-0.5 text-right text-xs"
                           />
                         ) : (
-                          <span>{prog.performance?.participants?.toLocaleString() || '-'}</span>
+                          <span>
+                            {prog.performance?.participants != null
+                              ? `${prog.performance.participants.toLocaleString()}${prog.performance.participants_unit || '명'}`
+                              : '-'}
+                          </span>
                         )}
                       </td>
 
@@ -1387,6 +1466,28 @@ export const ProgramsView: React.FC = () => {
                         )}
                       </td>
 
+                      {/* 비고 (인라인 수정 시 직접 입력 가능) */}
+                      <td className="py-2.5 px-3">
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            value={inlineDraft.performance?.etc_note ?? prog.performance?.etc_note ?? ''}
+                            onChange={(e) =>
+                              setInlineDraft({
+                                ...inlineDraft,
+                                performance: { ...prog.performance, ...inlineDraft.performance, etc_note: e.target.value },
+                              })
+                            }
+                            placeholder="비고 입력"
+                            className="w-full min-w-[140px] rounded-md border border-slate-300 px-1.5 py-0.5 text-xs"
+                          />
+                        ) : (
+                          <span className="text-slate-600 text-[11px] truncate block max-w-[180px]" title={prog.performance?.etc_note}>
+                            {prog.performance?.etc_note || <span className="text-slate-300">-</span>}
+                          </span>
+                        )}
+                      </td>
+
                       {/* 관리 (인라인 수정 / 삭제) */}
                       <td className="py-2.5 px-3 text-center sticky right-0 bg-white shadow-xs border-l border-slate-100">
                         {isEditing ? (
@@ -1421,7 +1522,7 @@ export const ProgramsView: React.FC = () => {
                               <button
                                 onClick={() => handleOpenBudgetEdit(prog)}
                                 className="text-slate-400 hover:text-emerald-600 p-1 rounded hover:bg-emerald-50 transition-colors"
-                                title="배정예산 / 추진일정 / 문서번호 / 비고 수정"
+                                title="프로그램 전체 수정 (명칭·예산·일정·문서번호·실적 등)"
                               >
                                 <DollarSign className="h-3.5 w-3.5" />
                               </button>
@@ -1514,11 +1615,13 @@ export const ProgramsView: React.FC = () => {
       {/* 5-B. 배정예산 / 추진일정 / 내부결재문서번호 편집 모달 */}
       {budgetEditTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
               <div>
-                <h3 className="text-base font-bold text-slate-900">배정예산 / 추진일정 / 문서번호 / 비고 수정</h3>
-                <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[280px]">{budgetEditTarget.name}</p>
+                <h3 className="text-base font-bold text-slate-900">실적 프로그램 전체 수정</h3>
+                <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[280px]">
+                  {budgetEditTarget.task_code} · {budgetEditTarget.item_code}
+                </p>
               </div>
               <button
                 onClick={() => setBudgetEditTarget(null)}
@@ -1529,6 +1632,54 @@ export const ProgramsView: React.FC = () => {
             </div>
 
             <div className="space-y-3.5">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-2">
+                  <label className="block text-xs font-bold text-slate-700 mb-1">프로그램명</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">차수</label>
+                  <input
+                    type="text"
+                    value={editRoundLabel}
+                    onChange={(e) => setEditRoundLabel(e.target.value)}
+                    placeholder="예: 1차"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">담당부서</label>
+                  <select
+                    value={editDepartment}
+                    onChange={(e) => setEditDepartment(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  >
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.name}>
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">담당자</label>
+                  <input
+                    type="text"
+                    value={editManager}
+                    onChange={(e) => setEditManager(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">배정예산 (₩)</label>
                 <input
@@ -1568,13 +1719,77 @@ export const ProgramsView: React.FC = () => {
                   type="text"
                   value={editDocNumber}
                   onChange={(e) => setEditDocNumber(e.target.value)}
-                  placeholder="예: 입학-2026-0210"
+                  placeholder="예: 혁신-2026-0001"
                   className="w-full rounded-lg border border-amber-300 bg-amber-50/40 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-amber-500"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
                   집행내역의 내부결재문서번호와 정확히 일치해야 실적-집행 연동이 이루어집니다. 이미 다른 곳에서
                   참조 중인 문서번호를 바꾸면 기존 연동이 끊어질 수 있으니 주의하세요.
                 </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">결과보고서 문서번호</label>
+                <input
+                  type="text"
+                  value={editResultDoc}
+                  onChange={(e) => setEditResultDoc(e.target.value)}
+                  placeholder="예: 혁신-2026-0001"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-4 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">상태</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as ItemStatus)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  >
+                    <option value="예정">예정</option>
+                    <option value="진행중">진행중</option>
+                    <option value="완료">완료</option>
+                    <option value="보류">보류</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">실적값</label>
+                  <input
+                    type="number"
+                    value={editParticipants}
+                    onChange={(e) => setEditParticipants(e.target.value)}
+                    placeholder="예: 45"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">단위</label>
+                  <input
+                    type="text"
+                    list="program-unit-suggestions"
+                    value={editParticipantsUnit}
+                    onChange={(e) => setEditParticipantsUnit(e.target.value)}
+                    placeholder="명/회/건"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <datalist id="program-unit-suggestions">
+                    <option value="명" />
+                    <option value="회" />
+                    <option value="건" />
+                  </datalist>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">만족도</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={editSatisfaction}
+                    onChange={(e) => setEditSatisfaction(e.target.value)}
+                    placeholder="해당 시만"
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
 
               <div>
@@ -1702,7 +1917,7 @@ export const ProgramsView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="예: 입학-2026-0210"
+                    placeholder="예: 혁신-2026-0001"
                     value={internalApprovalDocNumber}
                     onChange={(e) => setInternalApprovalDocNumber(e.target.value)}
                     className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-xs font-mono font-bold text-indigo-900 bg-indigo-50/40 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
@@ -1787,10 +2002,10 @@ export const ProgramsView: React.FC = () => {
                 </div>
               </div>
 
-              {/* Row 6: 정량 성과 (참여인원, 만족도, 결과보고서번호) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+              {/* Row 6: 정량 성과 (실적값+단위, 만족도, 결과보고서번호) */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-3.5">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">참여인원 (명)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">실적값</label>
                   <input
                     type="number"
                     placeholder="0"
@@ -1799,9 +2014,25 @@ export const ProgramsView: React.FC = () => {
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">단위</label>
+                  <input
+                    type="text"
+                    list="program-add-unit-suggestions"
+                    placeholder="명/회/건"
+                    value={participantsUnit}
+                    onChange={(e) => setParticipantsUnit(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  />
+                  <datalist id="program-add-unit-suggestions">
+                    <option value="명" />
+                    <option value="회" />
+                    <option value="건" />
+                  </datalist>
+                </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">만족도 점수 (5점 만점)</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">만족도 (해당 시만)</label>
                   <input
                     type="number"
                     step="0.1"
@@ -1823,7 +2054,7 @@ export const ProgramsView: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    placeholder="결과-2026-0001"
+                    placeholder="예: 혁신-2026-0001"
                     value={resultReportDocNumber}
                     onChange={(e) => setResultReportDocNumber(e.target.value)}
                     className="w-full rounded-lg border border-amber-300 bg-amber-50/40 px-3 py-2 text-xs font-mono font-semibold text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-amber-500"
