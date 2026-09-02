@@ -4,6 +4,8 @@ import { ItemStatus, Program, Task, TaskItem } from '../types';
 import { getDomainCode, getDomainColorTheme } from '../utils/domainColors';
 import { getTaskBudgetSummary } from '../services/budgetEngine';
 import { AchievementSection } from './AchievementSection';
+import { DocNumberHintInput } from './DocNumberHintInput';
+import { getPrimaryDepartment } from '../utils/departments';
 import {
   Plus,
   Search,
@@ -97,7 +99,7 @@ export const ProgramsView: React.FC = () => {
   const [itemCode, setItemCode] = useState<string>('IA-1-1-1');
   const [name, setName] = useState<string>('');
   const [roundLabel, setRoundLabel] = useState<string>('1차');
-  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('');
+  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('혁신-202');
   const [department, setDepartment] = useState<string>('입학취업처');
   const [manager, setManager] = useState<string>('');
   const [scheduleStart, setScheduleStart] = useState<string>('2026-03-01');
@@ -470,11 +472,11 @@ export const ProgramsView: React.FC = () => {
         const firstItem = (Object.values(firstTask.items || {}) as TaskItem[])[0];
         if (firstItem) {
           setItemCode(firstItem.code);
-          setDepartment(firstItem.department || '입학취업처');
+          setDepartment(getPrimaryDepartment(firstItem.department) || '입학취업처');
         }
       }
       setName('');
-      setInternalApprovalDocNumber(initialDocNumber || '');
+      setInternalApprovalDocNumber(initialDocNumber || '혁신-202');
       setBudget('');
       setAllocatedAmount('');
     }
@@ -498,7 +500,7 @@ export const ProgramsView: React.FC = () => {
     const firstItem = (Object.values(targetTask?.items || {}) as TaskItem[])[0];
     if (firstItem) {
       setItemCode(firstItem.code);
-      setDepartment(firstItem.department || department);
+      setDepartment(getPrimaryDepartment(firstItem.department) || department);
     }
   };
 
@@ -1716,12 +1718,10 @@ export const ProgramsView: React.FC = () => {
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   내부결재문서번호 (집행연계) ★
                 </label>
-                <input
-                  type="text"
+                <DocNumberHintInput
                   value={editDocNumber}
-                  onChange={(e) => setEditDocNumber(e.target.value)}
-                  placeholder="예: 혁신-2026-0001"
-                  className="w-full rounded-lg border border-amber-300 bg-amber-50/40 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                  onChange={setEditDocNumber}
+                  wrapperClassName="rounded-lg border border-amber-300 bg-amber-50/40 focus-within:ring-1 focus-within:ring-amber-500"
                 />
                 <p className="text-[10px] text-slate-400 mt-1">
                   집행내역의 내부결재문서번호와 정확히 일치해야 실적-집행 연동이 이루어집니다. 이미 다른 곳에서
@@ -1916,12 +1916,10 @@ export const ProgramsView: React.FC = () => {
                   <label className="block text-xs font-bold text-slate-700 mb-1">
                     내부결재문서번호 (집행연계) ★
                   </label>
-                  <input
-                    type="text"
-                    placeholder="예: 혁신-2026-0001"
+                  <DocNumberHintInput
                     value={internalApprovalDocNumber}
-                    onChange={(e) => setInternalApprovalDocNumber(e.target.value)}
-                    className="w-full rounded-lg border border-indigo-300 px-3 py-2 text-xs font-mono font-bold text-indigo-900 bg-indigo-50/40 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                    onChange={setInternalApprovalDocNumber}
+                    wrapperClassName="rounded-lg border border-indigo-300 bg-indigo-50/40 focus-within:ring-1 focus-within:ring-indigo-500"
                   />
                 </div>
 

@@ -4,6 +4,8 @@ import { Execution, ExpenseCategory, SignalFlag, Task, TaskItem } from '../types
 import { EXPENSE_CATEGORIES, SUB_CATEGORY_OPTIONS } from '../data/constants';
 import { calculateFundAllocation } from '../services/budgetEngine';
 import { exportExecutionsToExcel } from '../services/excelExport';
+import { DocNumberHintInput } from './DocNumberHintInput';
+import { getPrimaryDepartment } from '../utils/departments';
 import {
   downloadExecutionImportTemplate,
   parseExecutionImportFile,
@@ -101,7 +103,7 @@ export const ExecutionsView: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'계좌이체' | '법인카드'>('법인카드');
   const [cardId, setCardId] = useState<string>('card1');
   const [payee, setPayee] = useState<string>('');
-  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('');
+  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('혁신-202');
   const [invoiceDocNumber, setInvoiceDocNumber] = useState<string>('');
   const [voucherApprovalNumber, setVoucherApprovalNumber] = useState<string>('');
   const [flag, setFlag] = useState<SignalFlag>('green');
@@ -284,7 +286,7 @@ export const ExecutionsView: React.FC = () => {
       const firstItem = (Object.values(firstTask.items || {}) as TaskItem[])[0];
       if (firstItem) {
         setSelectedItemCode(firstItem.code);
-        setDepartment(firstItem.department || departments[0]?.name || '입학취업처');
+        setDepartment(getPrimaryDepartment(firstItem.department) || departments[0]?.name || '입학취업처');
       }
     }
     setDate(new Date().toISOString().slice(0, 10));
@@ -296,7 +298,7 @@ export const ExecutionsView: React.FC = () => {
     setPaymentMethod('법인카드');
     setCardId('card1');
     setPayee('');
-    setInternalApprovalDocNumber('');
+    setInternalApprovalDocNumber('혁신-202');
     setInvoiceDocNumber('');
     setVoucherApprovalNumber('');
     setFlag('green');
@@ -310,7 +312,7 @@ export const ExecutionsView: React.FC = () => {
     const firstItem = (Object.values(targetTask?.items || {}) as TaskItem[])[0];
     if (firstItem) {
       setSelectedItemCode(firstItem.code);
-      setDepartment(firstItem.department || department);
+      setDepartment(getPrimaryDepartment(firstItem.department) || department);
     }
   };
 
@@ -1588,7 +1590,7 @@ export const ExecutionsView: React.FC = () => {
                     onChange={(e) => {
                       setSelectedItemCode(e.target.value);
                       const targetItem = currentTask?.items[e.target.value];
-                      if (targetItem?.department) setDepartment(targetItem.department);
+                      if (targetItem?.department) setDepartment(getPrimaryDepartment(targetItem.department));
                     }}
                     className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
                   >
@@ -1849,12 +1851,10 @@ export const ExecutionsView: React.FC = () => {
                     <label className="block text-[11px] font-bold text-indigo-900 mb-1">
                       1) 내부결재문서번호 ★ (성과연동)
                     </label>
-                    <input
-                      type="text"
-                      placeholder="예: 혁신-2026-0001"
+                    <DocNumberHintInput
                       value={internalApprovalDocNumber}
-                      onChange={(e) => setInternalApprovalDocNumber(e.target.value)}
-                      className="w-full rounded-lg border border-indigo-300 bg-white px-3 py-1.5 text-xs font-mono font-bold text-indigo-900 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                      onChange={setInternalApprovalDocNumber}
+                      wrapperClassName="rounded-lg border border-indigo-300 bg-white focus-within:ring-1 focus-within:ring-indigo-500"
                     />
                   </div>
                   <div>

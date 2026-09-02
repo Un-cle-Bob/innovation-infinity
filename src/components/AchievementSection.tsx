@@ -3,6 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Achievement, AchievementCategory, ItemStatus } from '../types';
 import { ACHIEVEMENT_CATEGORIES, ACHIEVEMENT_SUBCATEGORY_OPTIONS } from '../data/constants';
 import { Plus, Edit2, Trash2, X, Check, FileText } from 'lucide-react';
+import { DocNumberHintInput } from './DocNumberHintInput';
 
 const getStatusColor = (status: ItemStatus) => {
   switch (status) {
@@ -26,7 +27,7 @@ const emptyForm = {
   manager: '',
   periodStart: '',
   periodEnd: '',
-  internalDoc: '',
+  internalDoc: '혁신-202',
   resultDoc: '',
   status: '예정' as ItemStatus,
   metricValue: '',
@@ -423,12 +424,10 @@ export const AchievementSection: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">내부결재문서번호</label>
-                <input
-                  type="text"
+                <DocNumberHintInput
                   value={form.internalDoc}
-                  onChange={(e) => setForm({ ...form, internalDoc: e.target.value })}
-                  placeholder="예: 혁신-2026-0001"
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                  onChange={(v) => setForm({ ...form, internalDoc: v })}
+                  wrapperClassName="rounded-lg border border-slate-300 focus-within:ring-1 focus-within:ring-indigo-500"
                 />
               </div>
 

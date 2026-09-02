@@ -8,8 +8,10 @@ import {
   Bell,
   Building2,
   User as UserIcon,
+  BookOpen,
 } from 'lucide-react';
 import { NewYearModal } from './NewYearModal';
+import { ManualModal } from './ManualModal';
 
 interface HeaderProps {
   activeTab: string;
@@ -26,6 +28,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
   } = useApp();
 
   const [isNewYearModalOpen, setIsNewYearModalOpen] = useState(false);
+  const [isManualModalOpen, setIsManualModalOpen] = useState(false);
 
   const getRoleBadge = (role: UserRole) => {
     switch (role) {
@@ -96,6 +99,15 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
               </div>
 
               <button
+                onClick={() => setIsManualModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors shadow-2xs"
+                title="시스템 사용 매뉴얼 보기 / 다운로드"
+              >
+                <BookOpen className="h-3.5 w-3.5" />
+                <span>매뉴얼</span>
+              </button>
+
+              <button
                 onClick={() => setIsNewYearModalOpen(true)}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/70 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 hover:border-indigo-300 transition-colors shadow-2xs"
                 title="기존 연도 구조를 복사하여 신규 연도 생성 (마스터 2절)"
@@ -152,6 +164,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
       </header>
 
       <NewYearModal isOpen={isNewYearModalOpen} onClose={() => setIsNewYearModalOpen(false)} />
+      {isManualModalOpen && <ManualModal onClose={() => setIsManualModalOpen(false)} />}
     </>
   );
 };

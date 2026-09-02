@@ -9,6 +9,8 @@ import {
   BudgetImportResult,
 } from '../services/budgetImport';
 import { getDomainCode, getDomainColorTheme } from '../utils/domainColors';
+import { parseDepartments } from '../utils/departments';
+import { MultiDeptSelect } from './MultiDeptSelect';
 import {
   FolderTree,
   Search,
@@ -130,7 +132,7 @@ export const TasksView: React.FC = () => {
 
     (Object.values(tasks) as Task[]).forEach((t) => {
       Object.values(t.items || {}).forEach((item) => {
-        if (item.department) deptSet.add(item.department);
+        parseDepartments(item.department).forEach((d) => deptSet.add(d));
       });
     });
 
@@ -145,7 +147,7 @@ export const TasksView: React.FC = () => {
       const items = Object.values(t.items || {}) as TaskItem[];
       const matchDept =
         selectedDepartment === 'ALL' ||
-        items.some((item) => item.department === selectedDepartment);
+        items.some((item) => parseDepartments(item.department).includes(selectedDepartment));
 
       const matchSearch =
         searchQuery.trim() === '' ||
@@ -163,7 +165,7 @@ export const TasksView: React.FC = () => {
     });
   }, [tasks, selectedDomain, selectedDepartment, searchQuery]);
 
-  // 부서별 추진항목 & 세부과제 그룹핑 데이터 (부서별 뷰)
+  // 부서별 추진항목 & 세부과제 그룹핑 데이터 (부서별 뷰). 부서가 2개 이상인 항목은 해당하는 모든 부서 그룹에 나타남
   const departmentGroupedData = useMemo(() => {
     const deptMap: {
       [deptName: string]: {
@@ -185,18 +187,21 @@ export const TasksView: React.FC = () => {
       if (selectedDomain !== 'ALL' && !t.code.startsWith(selectedDomain)) return;
 
       Object.values(t.items || {}).forEach((item) => {
-        const dName = item.department || '미지정';
-        if (!deptMap[dName]) {
-          deptMap[dName] = { department: dName, taskCodes: new Set(), items: [] };
-        }
+        const itemDepts = parseDepartments(item.department);
+        const targetDepts = itemDepts.length > 0 ? itemDepts : ['미지정'];
 
-        const matchSearch =
-          searchQuery.trim() === '' ||
-          dName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          t.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.code.toLowerCase().includes(searchQuery.toLowerCase());
+        targetDepts.forEach((dName) => {
+          if (!deptMap[dName]) {
+            deptMap[dName] = { department: dName, taskCodes: new Set(), items: [] };
+          }
+
+          const matchSearch =
+            searchQuery.trim() === '' ||
+            dName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            t.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.code.toLowerCase().includes(searchQuery.toLowerCase());
 
         if (matchSearch) {
           deptMap[dName].taskCodes.add(t.code);
@@ -206,6 +211,7 @@ export const TasksView: React.FC = () => {
             item,
           });
         }
+        });
       });
     });
 
@@ -831,17 +837,12 @@ export const TasksView: React.FC = () => {
                               className="flex-1 min-w-[160px] rounded-md border border-slate-300 px-2 py-1 text-xs"
                               required
                             />
-                            <select
+                            <MultiDeptSelect
+                              allDepts={departments}
                               value={newItemDept}
-                              onChange={(e) => setNewItemDept(e.target.value)}
-                              className="rounded-md border border-slate-300 px-2 py-1 text-xs"
-                            >
-                              {departments.map((d) => (
-                                <option key={d.id} value={d.name}>
-                                  {d.name}
-                                </option>
-                              ))}
-                            </select>
+                              onChange={setNewItemDept}
+                              className="flex items-center justify-between gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-xs min-w-[150px]"
+                            />
                             <button
                               type="submit"
                               className="rounded-md bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
@@ -888,17 +889,12 @@ export const TasksView: React.FC = () => {
                                         className="w-full rounded-md border border-indigo-300 px-2 py-1 text-xs font-bold"
                                         autoFocus
                                       />
-                                      <select
+                                      <MultiDeptSelect
+                                        allDepts={departments}
                                         value={editItemDept}
-                                        onChange={(e) => setEditItemDept(e.target.value)}
-                                        className="w-full rounded-md border border-slate-300 px-2 py-1 text-xs"
-                                      >
-                                        {departments.map((d) => (
-                                          <option key={d.id} value={d.name}>
-                                            {d.name}
-                                          </option>
-                                        ))}
-                                      </select>
+                                        onChange={setEditItemDept}
+                                        className="flex items-center justify-between gap-1 w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs"
+                                      />
                                       <div className="flex items-center gap-1.5">
                                         <button
                                           onClick={() => handleSaveEditItem(task.code, item.code)}
