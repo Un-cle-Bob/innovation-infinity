@@ -171,27 +171,101 @@ export function getFundColorTheme(source: string): FundColorTheme {
 }
 
 /**
- * 집행내역 목록을 받아 등록순(created_at 오름차순) 기준 영역별 관리연번(예: IA001, IA002, IB001) 매핑 테이블 생성
+ * 아직 manage_order(고정 관리번호)가 없는 집행내역들에 번호를 부여(백필)한다.
+ * 이미 번호가 있는 건은 절대 건드리지 않고, 없는 건들만 영역별로 현재 등록순(시간순) 그대로
+ * 그 영역의 최대 번호 다음부터 이어서 부여한다. 한 번 부여된 번호는 이후 다른 건이 삭제되어도
+ * 절대 바뀌지 않는다 (관리철 번호가 밀리지 않도록).
+ */
+export function ensureExecutionManageOrders(executions: Execution[]): Execution[] {
+  const byDomain: Record<string, Execution[]> = {};
+  executions.forEach((e) => {
+    const d = getDomainCode(e.task_code);
+    (byDomain[d] ||= []).push(e);
+  });
+
+  const result: Execution[] = [];
+  Object.values(byDomain).forEach((group) => {
+    const withOrder = group.filter((e) => e.manage_order != null);
+    const withoutOrder = group
+      .filter((e) => e.manage_order == null)
+      .sort((a, b) => {
+        const timeA = a.created_at || a.date || a.id;
+        const timeB = b.created_at || b.date || b.id;
+        return timeA.localeCompare(timeB);
+      });
+
+    if (withoutOrder.length === 0) {
+      result.push(...withOrder);
+      return;
+    }
+
+    let nextNum = withOrder.length > 0 ? Math.max(...withOrder.map((e) => e.manage_order!)) + 1 : 1;
+    const backfilled = withoutOrder.map((e) => ({ ...e, manage_order: nextNum++ }));
+    result.push(...withOrder, ...backfilled);
+  });
+
+  return result;
+}
+
+/**
+ * 집행내역 목록을 받아 관리연번(예: IA001, IA002, IB001) 표시용 매핑 테이블 생성.
+ * manage_order(고정 번호)가 있으면 그 값을 그대로 사용하고, 아직 없는 레거시 데이터는
+ * 화면 표시용으로만 등록순 기준 임시 번호를 계산한다(실제 저장은 add/delete/이동 시점에 이뤄짐).
  */
 export function getExecutionManageNoMap(executions: Execution[]): Map<string, string> {
   const manageNoMap = new Map<string, string>();
-  
-  // 등록순 (created_at 기준 오름차순, 없을 경우 id 순)
-  const sorted = [...executions].sort((a, b) => {
-    const timeA = a.created_at || a.date || a.id;
-    const timeB = b.created_at || b.date || b.id;
-    return timeA.localeCompare(timeB);
-  });
+  const withOrders = ensureExecutionManageOrders(executions);
 
-  const domainCounters: Record<string, number> = {};
-
-  sorted.forEach((exec) => {
+  withOrders.forEach((exec) => {
     const domain = getDomainCode(exec.task_code);
-    domainCounters[domain] = (domainCounters[domain] || 0) + 1;
-    const seqStr = String(domainCounters[domain]).padStart(3, '0');
-    const manageNo = `${domain}${seqStr}`;
-    manageNoMap.set(exec.id, manageNo);
+    const seqStr = String(exec.manage_order || 1).padStart(3, '0');
+    manageNoMap.set(exec.id, `${domain}${seqStr}`);
   });
 
   return manageNoMap;
+}
+
+/**
+ * 새 집행내역이 등록될 때 부여할 고정 관리번호를 계산한다. 그 영역에서 지금까지 한 번이라도
+ * 쓰인 적 있는 가장 큰 번호 다음 값이며, 이미 삭제된 건의 번호는 절대 재사용하지 않는다.
+ */
+export function getNextManageOrder(existingExecutions: Execution[], taskCode: string): number {
+  const domain = getDomainCode(taskCode);
+  const withOrders = ensureExecutionManageOrders(existingExecutions).filter(
+    (e) => getDomainCode(e.task_code) === domain
+  );
+  const maxOrder = withOrders.reduce((max, e) => Math.max(max, e.manage_order || 0), 0);
+  return maxOrder + 1;
+}
+
+/**
+ * 같은 영역(도메인) 내에서 특정 집행내역의 고정 관리번호를 바로 위/아래 건과 맞바꾼다.
+ * (번호를 재계산하는 것이 아니라 두 건의 번호를 교환하는 것이므로, 다른 건들의 번호는 전혀
+ * 바뀌지 않고 삭제로 인한 결번도 그대로 유지된다.) 반환값은 갱신이 필요한 레코드들 또는 null(이동 불가).
+ */
+export function reorderExecutionManageNo(
+  executions: Execution[],
+  execId: string,
+  direction: 'up' | 'down'
+): Execution[] | null {
+  const target = executions.find((e) => e.id === execId);
+  if (!target) return null;
+  const domain = getDomainCode(target.task_code);
+
+  const withOrders = ensureExecutionManageOrders(executions);
+  const domainExecs = withOrders.filter((e) => getDomainCode(e.task_code) === domain);
+  const sorted = [...domainExecs].sort((a, b) => (a.manage_order || 0) - (b.manage_order || 0));
+
+  const targetIdx = sorted.findIndex((e) => e.id === execId);
+  const swapIdx = direction === 'up' ? targetIdx - 1 : targetIdx + 1;
+  if (swapIdx < 0 || swapIdx >= sorted.length) return null;
+
+  const a = sorted[targetIdx];
+  const b = sorted[swapIdx];
+  const tmp = a.manage_order;
+  a.manage_order = b.manage_order;
+  b.manage_order = tmp;
+
+  // 이번에 새로 백필된 번호가 있을 수 있으니, 해당 영역 전체(변경분 포함)를 반환해 함께 저장한다
+  return domainExecs;
 }

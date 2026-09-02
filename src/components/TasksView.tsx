@@ -73,8 +73,13 @@ export const TasksView: React.FC = () => {
   const [editingTaskCode, setEditingTaskCode] = useState<string | null>(null);
   const [deleteTaskTarget, setDeleteTaskTarget] = useState<Task | null>(null);
   const [deleteItemTarget, setDeleteItemTarget] = useState<{ taskCode: string; item: TaskItem } | null>(null);
-  const [editingCostBasisTaskCode, setEditingCostBasisTaskCode] = useState<string | null>(null);
-  const [costBasisDraft, setCostBasisDraft] = useState<{ [category: string]: string }>({});
+  const [addingCostBasisTaskCode, setAddingCostBasisTaskCode] = useState<string | null>(null);
+  const [newCostBasisCategory, setNewCostBasisCategory] = useState<string>('');
+  const [newCostBasisContent, setNewCostBasisContent] = useState('');
+  const [editingCostBasisRow, setEditingCostBasisRow] = useState<{ taskCode: string; category: string } | null>(
+    null
+  );
+  const [editCostBasisContent, setEditCostBasisContent] = useState('');
   const [editTaskName, setEditTaskName] = useState('');
   const [editTaskDetail, setEditTaskDetail] = useState('');
 
@@ -705,7 +710,7 @@ export const TasksView: React.FC = () => {
                   {/* Expanded Details Body */}
                   {isExpanded && (
                     <div className="p-4 bg-slate-50/50 space-y-4">
-                      {/* 0) 산출내역 (비목별 산출근거) */}
+                      {/* 0) 산출내역 (비목별 산출근거) — 세부과제마다 비목 개수가 다르므로 행을 하나씩 추가하는 방식 */}
                       <div className="rounded-lg border border-slate-200 bg-white p-3.5 shadow-2xs">
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                           <div className="flex items-center gap-2">
@@ -713,74 +718,157 @@ export const TasksView: React.FC = () => {
                             <h4 className="text-xs font-bold text-slate-800">산출내역</h4>
                             <span className="text-[11px] text-slate-400">비목별 예산 산출근거</span>
                           </div>
-                          {canEditTasks && editingCostBasisTaskCode !== task.code && (
+                          {canEditTasks && addingCostBasisTaskCode !== task.code && (
                             <button
                               onClick={() => {
-                                setEditingCostBasisTaskCode(task.code);
-                                setCostBasisDraft({ ...(task.cost_basis || {}) });
+                                const usedCats = Object.keys(task.cost_basis || {}).filter(
+                                  (c) => task.cost_basis?.[c]
+                                );
+                                const nextCat = EXPENSE_CATEGORIES.find((c) => !usedCats.includes(c));
+                                if (!nextCat) {
+                                  showToast('7개 비목에 이미 모두 산출내역이 등록되어 있습니다.', 'info');
+                                  return;
+                                }
+                                setAddingCostBasisTaskCode(task.code);
+                                setNewCostBasisCategory(nextCat);
+                                setNewCostBasisContent('');
                               }}
-                              className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50"
+                              className="inline-flex items-center gap-1 rounded-md border border-indigo-300 bg-indigo-50 px-2 py-1 text-[11px] font-semibold text-indigo-700 hover:bg-indigo-100"
                             >
-                              <Edit3 className="h-3 w-3" />
-                              수정
+                              <Plus className="h-3 w-3" />
+                              행 추가
                             </button>
-                          )}
-                          {editingCostBasisTaskCode === task.code && (
-                            <div className="flex items-center gap-1.5">
-                              <button
-                                onClick={() => {
-                                  EXPENSE_CATEGORIES.forEach((cat) => {
-                                    updateTaskCostBasis(task.code, cat, costBasisDraft[cat] || '');
-                                  });
-                                  setEditingCostBasisTaskCode(null);
-                                }}
-                                className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
-                              >
-                                <Check className="h-3 w-3" />
-                                저장
-                              </button>
-                              <button
-                                onClick={() => setEditingCostBasisTaskCode(null)}
-                                className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-300"
-                              >
-                                <X className="h-3 w-3" />
-                                취소
-                              </button>
-                            </div>
                           )}
                         </div>
 
                         <div className="mt-2 divide-y divide-slate-100">
-                          {EXPENSE_CATEGORIES.map((cat) => {
-                            const isEditingThis = editingCostBasisTaskCode === task.code;
-                            const content = isEditingThis
-                              ? costBasisDraft[cat] || ''
-                              : task.cost_basis?.[cat] || '';
+                          {EXPENSE_CATEGORIES.filter((cat) => task.cost_basis?.[cat]).length === 0 &&
+                            addingCostBasisTaskCode !== task.code && (
+                              <p className="py-3 text-[11px] text-slate-400">
+                                등록된 산출내역이 없습니다. {canEditTasks && '"행 추가"를 눌러 비목별 산출근거를 입력해보세요.'}
+                              </p>
+                            )}
+
+                          {EXPENSE_CATEGORIES.filter((cat) => task.cost_basis?.[cat]).map((cat) => {
+                            const isEditingThis =
+                              editingCostBasisRow?.taskCode === task.code &&
+                              editingCostBasisRow?.category === cat;
                             return (
-                              <div key={cat} className="flex gap-3 py-2">
+                              <div key={cat} className="flex gap-3 py-2 group">
                                 <div className="w-28 shrink-0 pt-0.5">
                                   <span className="text-[11px] font-bold text-slate-700">{cat}</span>
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   {isEditingThis ? (
-                                    <textarea
-                                      value={content}
-                                      onChange={(e) =>
-                                        setCostBasisDraft((prev) => ({ ...prev, [cat]: e.target.value }))
-                                      }
-                                      rows={2}
-                                      placeholder="산출근거를 입력하세요 (예: 강사비 300,000원×3건=900,000원)"
-                                      className="w-full rounded-md border border-indigo-300 px-2 py-1.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
-                                    />
+                                    <div className="space-y-1.5">
+                                      <textarea
+                                        value={editCostBasisContent}
+                                        onChange={(e) => setEditCostBasisContent(e.target.value)}
+                                        rows={2}
+                                        autoFocus
+                                        className="w-full rounded-md border border-indigo-300 px-2 py-1.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                                      />
+                                      <div className="flex items-center gap-1.5">
+                                        <button
+                                          onClick={() => {
+                                            updateTaskCostBasis(task.code, cat, editCostBasisContent);
+                                            setEditingCostBasisRow(null);
+                                          }}
+                                          className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+                                        >
+                                          <Check className="h-3 w-3" />
+                                          저장
+                                        </button>
+                                        <button
+                                          onClick={() => setEditingCostBasisRow(null)}
+                                          className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-300"
+                                        >
+                                          취소
+                                        </button>
+                                      </div>
+                                    </div>
                                   ) : (
-                                    <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
-                                      {content || <span className="text-slate-300">-</span>}
-                                    </p>
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
+                                        {task.cost_basis?.[cat]}
+                                      </p>
+                                      {canEditTasks && (
+                                        <div className="flex items-center gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                          <button
+                                            onClick={() => {
+                                              setEditingCostBasisRow({ taskCode: task.code, category: cat });
+                                              setEditCostBasisContent(task.cost_basis?.[cat] || '');
+                                            }}
+                                            className="text-slate-400 hover:text-indigo-600 p-0.5"
+                                            title="수정"
+                                          >
+                                            <Edit3 className="h-3 w-3" />
+                                          </button>
+                                          <button
+                                            onClick={() => updateTaskCostBasis(task.code, cat, '')}
+                                            className="text-slate-400 hover:text-rose-600 p-0.5"
+                                            title="삭제"
+                                          >
+                                            <Trash2 className="h-3 w-3" />
+                                          </button>
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>
                             );
                           })}
+
+                          {/* 행 추가 폼 */}
+                          {addingCostBasisTaskCode === task.code && (
+                            <div className="flex gap-3 py-2.5 bg-indigo-50/40 -mx-3.5 px-3.5">
+                              <div className="w-28 shrink-0">
+                                <select
+                                  value={newCostBasisCategory}
+                                  onChange={(e) => setNewCostBasisCategory(e.target.value)}
+                                  className="w-full rounded-md border border-indigo-300 px-1.5 py-1 text-[11px] font-bold text-indigo-900 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                                >
+                                  {EXPENSE_CATEGORIES.filter(
+                                    (c) => !task.cost_basis?.[c] || c === newCostBasisCategory
+                                  ).map((c) => (
+                                    <option key={c} value={c}>
+                                      {c}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="flex-1 min-w-0 space-y-1.5">
+                                <textarea
+                                  value={newCostBasisContent}
+                                  onChange={(e) => setNewCostBasisContent(e.target.value)}
+                                  rows={2}
+                                  autoFocus
+                                  placeholder="산출근거를 입력하세요 (예: 강사비 300,000원×3건=900,000원)"
+                                  className="w-full rounded-md border border-indigo-300 px-2 py-1.5 text-xs focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                                />
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    onClick={() => {
+                                      if (!newCostBasisCategory) return;
+                                      updateTaskCostBasis(task.code, newCostBasisCategory, newCostBasisContent);
+                                      setAddingCostBasisTaskCode(null);
+                                    }}
+                                    className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700"
+                                  >
+                                    <Check className="h-3 w-3" />
+                                    추가
+                                  </button>
+                                  <button
+                                    onClick={() => setAddingCostBasisTaskCode(null)}
+                                    className="inline-flex items-center gap-1 rounded-md bg-slate-200 px-2 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-300"
+                                  >
+                                    취소
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 

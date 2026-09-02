@@ -36,6 +36,7 @@ import {
   RotateCcw,
   ShieldCheck,
   ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 type SortKey =
@@ -60,6 +61,8 @@ export const ExecutionsView: React.FC = () => {
     addExecution,
     updateExecution,
     deleteExecution,
+    moveExecutionOrder,
+    setExecutionManageOrder,
     canEditTab,
     canDeleteTab,
     showToast,
@@ -115,6 +118,8 @@ export const ExecutionsView: React.FC = () => {
 
   // Custom Delete Confirm Dialog State (Fixes iframe confirm() issues)
   const [deleteTarget, setDeleteTarget] = useState<Execution | null>(null);
+  const [editingManageNoId, setEditingManageNoId] = useState<string | null>(null);
+  const [editManageNoValue, setEditManageNoValue] = useState('');
 
   const taskList = Object.values(tasks) as Task[];
   const currentTask = tasks[selectedTaskCode];
@@ -902,15 +907,83 @@ export const ExecutionsView: React.FC = () => {
                         )}
                       </td>
 
-                      {/* 영역별 관리연번 (IA001 등) */}
+                      {/* 영역별 관리연번 (IA001 등) — 클릭해서 직접 수정하거나 화살표로 순서 교환 가능 */}
                       <td className="py-2.5 px-3">
-                        <span
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-mono font-extrabold shadow-2xs border ${domainTheme.badge}`}
-                          title={`등록순 영역 관리연번: ${manageNo}`}
-                        >
-                          <span className={`h-1.5 w-1.5 rounded-full ${domainTheme.dot}`} />
-                          {manageNo}
-                        </span>
+                        {editingManageNoId === exec.id ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs font-mono font-bold text-slate-500">{domainCode}</span>
+                            <input
+                              type="number"
+                              autoFocus
+                              value={editManageNoValue}
+                              onChange={(e) => setEditManageNoValue(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  const n = Number(editManageNoValue);
+                                  if (n > 0) setExecutionManageOrder(exec.id, n);
+                                  setEditingManageNoId(null);
+                                } else if (e.key === 'Escape') {
+                                  setEditingManageNoId(null);
+                                }
+                              }}
+                              className="w-16 rounded-md border border-indigo-300 px-1.5 py-0.5 text-xs font-mono font-bold focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+                            />
+                            <button
+                              onClick={() => {
+                                const n = Number(editManageNoValue);
+                                if (n > 0) setExecutionManageOrder(exec.id, n);
+                                setEditingManageNoId(null);
+                              }}
+                              className="text-emerald-600 hover:text-emerald-700"
+                              title="저장"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => setEditingManageNoId(null)}
+                              className="text-slate-400 hover:text-slate-600"
+                              title="취소"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => {
+                                if (!canEditTab('executions')) return;
+                                setEditingManageNoId(exec.id);
+                                setEditManageNoValue(String(exec.manage_order || parseInt(manageNo.slice(2), 10) || 1));
+                              }}
+                              disabled={!canEditTab('executions')}
+                              className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-mono font-extrabold shadow-2xs border ${domainTheme.badge} ${
+                                canEditTab('executions') ? 'hover:ring-2 hover:ring-indigo-300 cursor-pointer' : ''
+                              }`}
+                              title={canEditTab('executions') ? '클릭해서 관리번호 직접 수정' : `관리연번: ${manageNo}`}
+                            >
+                              <span className={`h-1.5 w-1.5 rounded-full ${domainTheme.dot}`} />
+                              {manageNo}
+                            </button>
+                            {sortKey === 'manageNo' && canEditTab('executions') && (
+                              <div className="flex flex-col">
+                                <button
+                                  onClick={() => moveExecutionOrder(exec.id, 'up')}
+                                  className="text-slate-300 hover:text-indigo-600 leading-none"
+                                  title="이 영역 안에서 바로 위 건과 번호를 맞바꿈"
+                                >
+                                  <ChevronUp className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => moveExecutionOrder(exec.id, 'down')}
+                                  className="text-slate-300 hover:text-indigo-600 leading-none"
+                                  title="이 영역 안에서 바로 아래 건과 번호를 맞바꿈"
+                                >
+                                  <ChevronDown className="h-3 w-3" />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </td>
 
                       {/* 영역 / 세부과제 (수정 가능) */}

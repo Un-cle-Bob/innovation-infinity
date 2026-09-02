@@ -129,6 +129,8 @@ export interface Execution {
   created_by: string;
   created_at: string;
   updated_at?: string;
+  /** 관리연번(등록순 자동번호) 표시 순서를 사용자가 조정한 경우에만 설정됨. 같은 영역 내에서만 비교됨 */
+  manage_order?: number;
 }
 
 export interface Program {

@@ -17,6 +17,7 @@ import {
   YearData,
 } from '../types';
 import { calculateFundAllocation } from '../services/budgetEngine';
+import { reorderExecutionManageNo, getNextManageOrder, getDomainCode } from '../utils/domainColors';
 import { recalculateKpiTree } from '../services/kpiEngine';
 import {
   cloneYearData,
@@ -95,6 +96,8 @@ interface AppContextType {
     isPendingApproval?: boolean;
     error?: string;
   };
+  moveExecutionOrder: (execId: string, direction: 'up' | 'down') => void;
+  setExecutionManageOrder: (execId: string, newOrder: number) => void;
 
   // Approval Workflow Actions (4절)
   approveRequest: (requestId: string) => void;
@@ -623,6 +626,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       fund_allocations: allocResult.allocations,
       created_by: currentUser.name,
       created_at: new Date().toISOString(),
+      manage_order: getNextManageOrder(allExecs, execData.task_code),
     };
 
     // 4절: 보조관리자도 신규 등록은 즉시 반영!
@@ -751,6 +755,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     showToast('집행내역이 삭제되었습니다.', 'success');
     return { success: true };
+  };
+
+  /** 같은 영역(도메인) 내에서 집행내역의 관리연번 순서를 한 칸 위/아래로 이동 */
+  const moveExecutionOrder = (execId: string, direction: 'up' | 'down') => {
+    mutateYearData((prev) => {
+      const allExecs = Object.values(prev.executions) as Execution[];
+      const updated = reorderExecutionManageNo(allExecs, execId, direction);
+      if (!updated) return prev;
+
+      const nextExecutions = { ...prev.executions };
+      updated.forEach((e) => {
+        nextExecutions[e.id] = e;
+      });
+      return { ...prev, executions: nextExecutions };
+    });
+  };
+
+  /**
+   * 관리연번의 숫자 부분을 사용자가 직접 입력해 고정 번호를 바꾼다. 같은 영역 안에 이미 그 번호를
+   * 쓰는 다른 건이 있으면 막지는 않되 경고 토스트만 띄운다(자동 배정 로직은 항상 현재 최댓값+1을
+   * 계산하므로, 향후 새 번호가 이 수정값과 충돌할 일은 없다).
+   */
+  const setExecutionManageOrder = (execId: string, newOrder: number) => {
+    const target = yearData.executions[execId];
+    if (!target) return;
+    const domain = getDomainCode(target.task_code);
+    const duplicate = (Object.values(yearData.executions) as Execution[]).find(
+      (e) => e.id !== execId && getDomainCode(e.task_code) === domain && e.manage_order === newOrder
+    );
+
+    mutateYearData((prev) => {
+      const orig = prev.executions[execId];
+      if (!orig) return prev;
+      return {
+        ...prev,
+        executions: { ...prev.executions, [execId]: { ...orig, manage_order: newOrder } },
+      };
+    });
+
+    if (duplicate) {
+      showToast(
+        `이미 같은 영역에서 사용 중인 번호입니다 (${domain}${String(newOrder).padStart(3, '0')}). 번호는 저장되었지만 다른 건과 중복 표시될 수 있어요.`,
+        'error'
+      );
+    }
   };
 
   // Approval Workflow (4절)
@@ -1251,6 +1300,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addExecution,
         updateExecution,
         deleteExecution,
+        moveExecutionOrder,
+        setExecutionManageOrder,
         approveRequest,
         rejectRequest,
         addProgram,
