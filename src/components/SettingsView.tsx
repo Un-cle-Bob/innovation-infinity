@@ -35,6 +35,8 @@ export const SettingsView: React.FC = () => {
   const canDelete = isSuperAdmin;
 
   const [newDeptName, setNewDeptName] = useState('');
+  const [deleteDeptTarget, setDeleteDeptTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteCardTarget, setDeleteCardTarget] = useState<{ id: string; label: string } | null>(null);
   const [newCardLabel, setNewCardLabel] = useState('');
   const [newCardLast4, setNewCardLast4] = useState('');
 
@@ -182,11 +184,7 @@ export const SettingsView: React.FC = () => {
                       )}
                       {canDelete && (
                         <button
-                          onClick={() => {
-                            if (confirm(`[${dept.name}] 부서를 삭제하시겠습니까?`)) {
-                              deleteDepartment(dept.id);
-                            }
-                          }}
+                          onClick={() => setDeleteDeptTarget({ id: dept.id, name: dept.name })}
                           className="text-slate-400 hover:text-rose-600 p-0.5"
                           title="삭제"
                         >
@@ -309,11 +307,7 @@ export const SettingsView: React.FC = () => {
                       )}
                       {canDelete && (
                         <button
-                          onClick={() => {
-                            if (confirm(`[${card.label}] 법인카드를 삭제하시겠습니까?`)) {
-                              deleteCorporateCard(card.id);
-                            }
-                          }}
+                          onClick={() => setDeleteCardTarget({ id: card.id, label: card.label })}
                           className="text-slate-400 hover:text-rose-600 p-1"
                           title="삭제"
                         >
@@ -450,6 +444,63 @@ export const SettingsView: React.FC = () => {
           })}
         </div>
       </div>
+
+      {/* 부서/법인카드 삭제 확인 모달 (iframe 환경에서 window.confirm이 안 뜨는 문제를 피하기 위해 커스텀으로 구현) */}
+      {deleteDeptTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <h3 className="text-base font-bold text-slate-900">담당부서 삭제</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              <strong>[{deleteDeptTarget.name}]</strong> 부서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
+              <button
+                onClick={() => setDeleteDeptTarget(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  deleteDepartment(deleteDeptTarget.id);
+                  setDeleteDeptTarget(null);
+                }}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-xs"
+              >
+                삭제하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteCardTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <h3 className="text-base font-bold text-slate-900">법인카드 삭제</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              <strong>[{deleteCardTarget.label}]</strong> 법인카드를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
+              <button
+                onClick={() => setDeleteCardTarget(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  deleteCorporateCard(deleteCardTarget.id);
+                  setDeleteCardTarget(null);
+                }}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-xs"
+              >
+                삭제하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

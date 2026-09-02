@@ -101,8 +101,8 @@ export const ExecutionsView: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'계좌이체' | '법인카드'>('법인카드');
   const [cardId, setCardId] = useState<string>('card1');
   const [payee, setPayee] = useState<string>('');
-  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('혁신-202');
-  const [invoiceDocNumber, setInvoiceDocNumber] = useState<string>('혁신-202');
+  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('');
+  const [invoiceDocNumber, setInvoiceDocNumber] = useState<string>('');
   const [voucherApprovalNumber, setVoucherApprovalNumber] = useState<string>('');
   const [flag, setFlag] = useState<SignalFlag>('green');
   const [flagNote, setFlagNote] = useState<string>('');
@@ -296,8 +296,8 @@ export const ExecutionsView: React.FC = () => {
     setPaymentMethod('법인카드');
     setCardId('card1');
     setPayee('');
-    setInternalApprovalDocNumber('혁신-202');
-    setInvoiceDocNumber('혁신-202');
+    setInternalApprovalDocNumber('');
+    setInvoiceDocNumber('');
     setVoucherApprovalNumber('');
     setFlag('green');
     setFlagNote('');

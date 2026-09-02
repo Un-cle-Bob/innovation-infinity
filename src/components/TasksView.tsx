@@ -68,6 +68,8 @@ export const TasksView: React.FC = () => {
   const [newTaskDetail, setNewTaskDetail] = useState('');
 
   const [editingTaskCode, setEditingTaskCode] = useState<string | null>(null);
+  const [deleteTaskTarget, setDeleteTaskTarget] = useState<Task | null>(null);
+  const [deleteItemTarget, setDeleteItemTarget] = useState<{ taskCode: string; item: TaskItem } | null>(null);
   const [editTaskName, setEditTaskName] = useState('');
   const [editTaskDetail, setEditTaskDetail] = useState('');
 
@@ -280,14 +282,7 @@ export const TasksView: React.FC = () => {
 
   const handleDeleteTask = (task: Task, e: React.MouseEvent) => {
     e.stopPropagation();
-    const itemCount = Object.keys(task.items || {}).length;
-    const msg =
-      itemCount > 0
-        ? `[${task.code}] ${task.name}\n주요추진항목 ${itemCount}개가 함께 삭제됩니다. 정말 삭제하시겠습니까?\n(이미 등록된 집행내역/실적은 삭제되지 않고 남아있을 수 있으니 주의하세요)`
-        : `[${task.code}] ${task.name}을(를) 삭제하시겠습니까?`;
-    if (confirm(msg)) {
-      deleteTask(task.code);
-    }
+    setDeleteTaskTarget(task);
   };
 
   // 주요추진항목 추가/수정/삭제 핸들러
@@ -318,9 +313,7 @@ export const TasksView: React.FC = () => {
   };
 
   const handleDeleteItem = (taskCode: string, item: TaskItem) => {
-    if (confirm(`[${item.code}] ${item.name}을(를) 삭제하시겠습니까?`)) {
-      deleteItem(taskCode, item.code);
-    }
+    setDeleteItemTarget({ taskCode, item });
   };
 
   const handleOpenMatrixModal = (task: Task) => {
@@ -718,7 +711,14 @@ export const TasksView: React.FC = () => {
                         </div>
 
                         <div className="overflow-x-auto mt-2">
-                          <table className="w-full text-xs text-left">
+                          <table className="w-full text-xs text-left table-fixed">
+                            <colgroup>
+                              <col style={{ width: '18%' }} />
+                              <col style={{ width: '22%' }} />
+                              <col style={{ width: '22%' }} />
+                              <col style={{ width: '22%' }} />
+                              <col style={{ width: '16%' }} />
+                            </colgroup>
                             <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                               <tr>
                                 <th className="p-2 font-semibold">비목</th>
@@ -739,40 +739,46 @@ export const TasksView: React.FC = () => {
                                     }`}
                                   >
                                     <td className="p-2 font-medium">{c.category}</td>
-                                    <td className="p-2 text-right font-mono text-[11px]">
+                                    <td className="p-2">
                                       {c.budget.이월금 > 0 || c.executed.이월금 > 0 ? (
-                                        <span>
-                                          {c.budget.이월금.toLocaleString()} /{' '}
-                                          <strong className="text-emerald-600">{c.executed.이월금.toLocaleString()}</strong> /{' '}
-                                          <span className="text-blue-600 font-bold">{c.remaining.이월금.toLocaleString()}</span>
-                                        </span>
+                                        <div className="flex items-center justify-end gap-1 font-mono text-[11px] tabular-nums">
+                                          <span className="w-14 text-right truncate">{c.budget.이월금.toLocaleString()}</span>
+                                          <span className="text-slate-300">/</span>
+                                          <span className="w-14 text-right truncate font-bold text-emerald-600">{c.executed.이월금.toLocaleString()}</span>
+                                          <span className="text-slate-300">/</span>
+                                          <span className="w-14 text-right truncate font-bold text-blue-600">{c.remaining.이월금.toLocaleString()}</span>
+                                        </div>
                                       ) : (
-                                        '-'
+                                        <div className="text-right text-slate-300">-</div>
                                       )}
                                     </td>
-                                    <td className="p-2 text-right font-mono text-[11px]">
+                                    <td className="p-2">
                                       {c.budget.기본사업비 > 0 || c.executed.기본사업비 > 0 ? (
-                                        <span>
-                                          {c.budget.기본사업비.toLocaleString()} /{' '}
-                                          <strong className="text-emerald-600">{c.executed.기본사업비.toLocaleString()}</strong> /{' '}
-                                          <span className="text-blue-600 font-bold">{c.remaining.기본사업비.toLocaleString()}</span>
-                                        </span>
+                                        <div className="flex items-center justify-end gap-1 font-mono text-[11px] tabular-nums">
+                                          <span className="w-14 text-right truncate">{c.budget.기본사업비.toLocaleString()}</span>
+                                          <span className="text-slate-300">/</span>
+                                          <span className="w-14 text-right truncate font-bold text-emerald-600">{c.executed.기본사업비.toLocaleString()}</span>
+                                          <span className="text-slate-300">/</span>
+                                          <span className="w-14 text-right truncate font-bold text-blue-600">{c.remaining.기본사업비.toLocaleString()}</span>
+                                        </div>
                                       ) : (
-                                        '-'
+                                        <div className="text-right text-slate-300">-</div>
                                       )}
                                     </td>
-                                    <td className="p-2 text-right font-mono text-[11px]">
+                                    <td className="p-2">
                                       {c.budget.적정규모화 > 0 || c.executed.적정규모화 > 0 ? (
-                                        <span>
-                                          {c.budget.적정규모화.toLocaleString()} /{' '}
-                                          <strong className="text-emerald-600">{c.executed.적정규모화.toLocaleString()}</strong> /{' '}
-                                          <span className="text-blue-600 font-bold">{c.remaining.적정규모화.toLocaleString()}</span>
-                                        </span>
+                                        <div className="flex items-center justify-end gap-1 font-mono text-[11px] tabular-nums">
+                                          <span className="w-14 text-right truncate">{c.budget.적정규모화.toLocaleString()}</span>
+                                          <span className="text-slate-300">/</span>
+                                          <span className="w-14 text-right truncate font-bold text-emerald-600">{c.executed.적정규모화.toLocaleString()}</span>
+                                          <span className="text-slate-300">/</span>
+                                          <span className="w-14 text-right truncate font-bold text-blue-600">{c.remaining.적정규모화.toLocaleString()}</span>
+                                        </div>
                                       ) : (
-                                        '-'
+                                        <div className="text-right text-slate-300">-</div>
                                       )}
                                     </td>
-                                    <td className="p-2 text-right font-mono text-xs font-bold text-indigo-900">
+                                    <td className="p-2 text-right font-mono text-xs font-bold text-indigo-900 tabular-nums">
                                       ₩{c.remaining.total.toLocaleString()}
                                     </td>
                                   </tr>
@@ -1424,6 +1430,76 @@ export const TasksView: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3-D. 세부과제/항목 삭제 확인 모달 (iframe에서 window.confirm이 안 뜨는 문제를 피하기 위해 커스텀으로 구현) */}
+      {deleteTaskTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <h3 className="text-base font-bold text-slate-900">세부과제 삭제</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              <strong>
+                [{deleteTaskTarget.code}] {deleteTaskTarget.name}
+              </strong>
+              을(를) 삭제하시겠습니까?
+              {Object.keys(deleteTaskTarget.items || {}).length > 0 && (
+                <>
+                  {' '}
+                  주요추진항목 {Object.keys(deleteTaskTarget.items || {}).length}개가 함께 삭제됩니다.
+                </>
+              )}{' '}
+              (이미 등록된 집행내역/실적은 삭제되지 않고 남아있을 수 있으니 주의하세요)
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
+              <button
+                onClick={() => setDeleteTaskTarget(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  deleteTask(deleteTaskTarget.code);
+                  setDeleteTaskTarget(null);
+                }}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-xs"
+              >
+                삭제하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteItemTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl border border-slate-200">
+            <h3 className="text-base font-bold text-slate-900">주요추진항목 삭제</h3>
+            <p className="text-xs text-slate-500 mt-1">
+              <strong>
+                [{deleteItemTarget.item.code}] {deleteItemTarget.item.name}
+              </strong>
+              을(를) 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </p>
+            <div className="flex items-center justify-end gap-2 pt-4 mt-4 border-t border-slate-100">
+              <button
+                onClick={() => setDeleteItemTarget(null)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => {
+                  deleteItem(deleteItemTarget.taskCode, deleteItemTarget.item.code);
+                  setDeleteItemTarget(null);
+                }}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white hover:bg-rose-700 shadow-xs"
+              >
+                삭제하기
+              </button>
+            </div>
           </div>
         </div>
       )}

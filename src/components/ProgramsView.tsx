@@ -97,7 +97,7 @@ export const ProgramsView: React.FC = () => {
   const [itemCode, setItemCode] = useState<string>('IA-1-1-1');
   const [name, setName] = useState<string>('');
   const [roundLabel, setRoundLabel] = useState<string>('1차');
-  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('혁신-202');
+  const [internalApprovalDocNumber, setInternalApprovalDocNumber] = useState<string>('');
   const [department, setDepartment] = useState<string>('입학취업처');
   const [manager, setManager] = useState<string>('');
   const [scheduleStart, setScheduleStart] = useState<string>('2026-03-01');
@@ -105,7 +105,7 @@ export const ProgramsView: React.FC = () => {
   const [budget, setBudget] = useState<number | ''>('');
   const [allocatedAmount, setAllocatedAmount] = useState<number | ''>('');
   const [status, setStatus] = useState<ItemStatus>('예정');
-  const [resultReportDocNumber, setResultReportDocNumber] = useState<string>('혁신-202');
+  const [resultReportDocNumber, setResultReportDocNumber] = useState<string>('');
   const [participants, setParticipants] = useState<number | ''>('');
   const [participantsUnit, setParticipantsUnit] = useState<string>('명');
   const [satisfactionScore, setSatisfactionScore] = useState<number | ''>('');
@@ -474,7 +474,7 @@ export const ProgramsView: React.FC = () => {
         }
       }
       setName('');
-      setInternalApprovalDocNumber(initialDocNumber || '혁신-202');
+      setInternalApprovalDocNumber(initialDocNumber || '');
       setBudget('');
       setAllocatedAmount('');
     }
@@ -484,7 +484,7 @@ export const ProgramsView: React.FC = () => {
     setScheduleStart('2026-03-01');
     setScheduleEnd('2026-06-30');
     setStatus('진행중');
-    setResultReportDocNumber('혁신-202');
+    setResultReportDocNumber('');
     setParticipants('');
     setParticipantsUnit('명');
     setSatisfactionScore('');
